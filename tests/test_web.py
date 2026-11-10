@@ -51,10 +51,18 @@ class CalculateRouteTests(unittest.TestCase):
         self.assertIn("ตัวเลข", response.get_data(as_text=True))
 
     def test_resistor_unit_converts_kilo_ohm(self):
-        kilo = self.post()
-        ohm = self.post(r_unit="", r1="100000", r2="22000", rc="2200", re="1000")
-        self.assertIn("9.294", kilo.get_data(as_text=True))
-        self.assertIn("9.294", ohm.get_data(as_text=True))
+        kilo = self.post().get_data(as_text=True)
+        ohm = self.post(r_unit="", r1="100000", r2="22000", rc="2200", re="1000").get_data(as_text=True)
+
+        for body in (kilo, ohm):
+            self.assertIn("9.294", body)
+            self.assertIn("1.230 mA", body)
+            self.assertIn("12.299 µA", body)
+            self.assertIn("1.242 mA", body)
+
+    def test_ohm_unit_is_not_scaled(self):
+        body = self.post(r_unit="", r1="100", r2="22", rc="2.2", re="1").get_data(as_text=True)
+        self.assertIn("1229.858 mA", body)
 
     def test_extreme_beta_does_not_show_nan(self):
         body = self.post(beta="1e12").get_data(as_text=True).lower()
