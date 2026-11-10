@@ -1,6 +1,6 @@
 import unittest
 
-from dc_bias import calculate
+from dc_bias import ValidationError, calculate, to_float, validate_inputs
 
 
 class ReferencePointTests(unittest.TestCase):
@@ -23,6 +23,36 @@ class ReferencePointTests(unittest.TestCase):
     def test_reference_point_is_forward_active(self):
         self.assertEqual(self.result.region, "Forward Active")
         self.assertEqual(self.result.warnings, ())
+
+
+class InputParsingTests(unittest.TestCase):
+    def test_accepts_surrounding_whitespace(self):
+        self.assertEqual(to_float("  100 ", "R1"), 100.0)
+
+    def test_accepts_thousands_separator(self):
+        self.assertEqual(to_float("1,000", "R1"), 1000.0)
+
+    def test_rejects_empty(self):
+        with self.assertRaises(ValidationError):
+            to_float("   ", "R1")
+
+    def test_rejects_non_numeric(self):
+        with self.assertRaises(ValidationError):
+            to_float("abc", "R1")
+
+
+class ValidationTests(unittest.TestCase):
+    def test_rejects_zero_resistance(self):
+        with self.assertRaises(ValidationError):
+            validate_inputs(12.0, 0.0, 22_000.0, 2_200.0, 1_000.0, 100.0, 0.70)
+
+    def test_rejects_non_positive_beta(self):
+        with self.assertRaises(ValidationError):
+            validate_inputs(12.0, 100_000.0, 22_000.0, 2_200.0, 1_000.0, 0.0, 0.70)
+
+    def test_rejects_vbe_not_below_vcc(self):
+        with self.assertRaises(ValidationError):
+            validate_inputs(12.0, 100_000.0, 22_000.0, 2_200.0, 1_000.0, 100.0, 12.0)
 
 
 if __name__ == "__main__":
