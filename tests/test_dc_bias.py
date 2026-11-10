@@ -55,5 +55,24 @@ class ValidationTests(unittest.TestCase):
             validate_inputs(12.0, 100_000.0, 22_000.0, 2_200.0, 1_000.0, 100.0, 12.0)
 
 
+class RegionTests(unittest.TestCase):
+    def test_cutoff_when_base_divider_below_vbe(self):
+        result = calculate(12.0, 100_000.0, 1_000.0, 2_200.0, 1_000.0, 100.0, 0.70)
+        self.assertEqual(result.region, "Cutoff")
+        self.assertGreater(len(result.warnings), 0)
+        self.assertEqual(result.ic, 0.0)
+        self.assertEqual(result.ve, 0.0)
+
+    def test_saturation_when_collector_resistor_too_large(self):
+        result = calculate(12.0, 100_000.0, 22_000.0, 50_000.0, 1_000.0, 100.0, 0.70)
+        self.assertEqual(result.region, "Saturation")
+        self.assertEqual(len(result.warnings), 2)
+
+    def test_reference_point_has_no_warning(self):
+        result = calculate(12.0, 100_000.0, 22_000.0, 2_200.0, 1_000.0, 100.0, 0.70)
+        self.assertEqual(result.region, "Forward Active")
+        self.assertEqual(result.warnings, ())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,9 @@ All values inside BiasResult are in SI units (volts, amps, ohms).
 
 from dataclasses import dataclass
 
+VCE_SAT = 0.2
+"""Collector-emitter saturation threshold used for the region warning [V]."""
+
 
 class ValidationError(Exception):
     """Raised when an input value cannot be used by the DC bias model."""
@@ -75,6 +78,24 @@ def calculate(
 ) -> BiasResult:
     vth = vcc * r2 / (r1 + r2)
     rth = r1 * r2 / (r1 + r2)
+
+    if vth <= vbe:
+        return BiasResult(
+            vth=vth,
+            rth=rth,
+            ib=0.0,
+            ic=0.0,
+            ie=0.0,
+            ve=0.0,
+            vb=vth,
+            vc=vcc,
+            vce=vcc,
+            region="Cutoff",
+            warnings=(
+                "วงจรอยู่ในช่วง Cutoff — IB ≤ 0 และแบบจำลอง Forward-Active ใช้ไม่ได้",
+            ),
+        )
+
     ib = (vth - vbe) / (rth + (beta + 1) * re)
     ic = beta * ib
     ie = (beta + 1) * ib
@@ -82,6 +103,17 @@ def calculate(
     vb = ve + vbe
     vc = vcc - ic * rc
     vce = vc - ve
+
+    warnings = []
+    if vce < VCE_SAT:
+        warnings.append(
+            "VCE ต่ำกว่า VCE(sat) ≈ 0.2 V — วงจรอยู่ใน Saturation "
+            "และแบบจำลอง Forward-Active ใช้ไม่ได้"
+        )
+    if vc < 0:
+        warnings.append(
+            "VC ติดลบ แสดงว่า RC ใหญ่เกินกว่าที่วงจรจะอยู่ใน Active Region"
+        )
 
     return BiasResult(
         vth=vth,
@@ -93,6 +125,6 @@ def calculate(
         vb=vb,
         vc=vc,
         vce=vce,
-        region="Forward Active",
-        warnings=(),
+        region="Saturation" if vce < VCE_SAT else "Forward Active",
+        warnings=tuple(warnings),
     )
