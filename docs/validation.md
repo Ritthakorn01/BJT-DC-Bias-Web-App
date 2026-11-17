@@ -77,13 +77,13 @@ ohm_unit   -> HTTP 200 | region=Forward Active | VB=1.942 (ให้ผลตร
 - ค่าที่กรอกร่วม: VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V, หน่วย kΩ
 - เกณฑ์ผ่าน: IC ±0.01 mA และ VCE ±0.02 V เทียบค่ามือ
 
-| # | โหมด / อินพุต | VB | VE | VC | VCE | IC | IB | IE | Region | ผล |
-|---|---|---|---|---|---|---|---|---|---|---|
-| A1 | Divider · R1=100 kΩ, R2=22 kΩ, RE=1 kΩ | 1.942 V | 1.242 V | 9.294 V | 8.052 V | 1.230 mA | 12.299 µA | 1.242 mA | Forward Active | ผ่าน |
-| A2 | Fixed · RB=1 MΩ | 0.700 V | 0.000 V | 9.514 V | 9.514 V | 1.130 mA | 11.300 µA | 1.141 mA | Forward Active | ผ่าน |
-| A3 | Emitter · RB=1 MΩ, RE=1 kΩ | 1.737 V | 1.037 V | 9.742 V | 8.705 V | 1.026 mA | 10.263 µA | 1.037 mA | Forward Active | ผ่าน |
-| A4 | Emitter · RB=1 MΩ, RE=2 kΩ | 2.599 V | 1.899 V | 9.932 V | 8.033 V | 0.940 mA | 9.401 µA | 0.950 mA | Forward Active | ผ่าน |
-| A5 | Fixed · RB=0 | — | — | — | — | — | — | — | ไม่แสดงผล | ผ่าน |
+| # | โหมด / อินพุต | ค่าคาดหมาย (IC / VCE) | VB | VE | VC | VCE | IC | IB | IE | Region | วิธีตรวจ | ผล |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| A1 | Divider · R1=100 kΩ, R2=22 kΩ, RE=1 kΩ | 1.2299 mA / 8.0522 V | 1.942 V | 1.242 V | 9.294 V | 8.052 V | 1.230 mA | 12.299 µA | 1.242 mA | Forward Active | OpenCode Browser | ผ่าน |
+| A2 | Fixed · RB=1 MΩ | 1.1300 mA / 9.5140 V | 0.700 V | 0.000 V | 9.514 V | 9.514 V | 1.130 mA | 11.300 µA | 1.141 mA | Forward Active | OpenCode Browser | ผ่าน |
+| A3 | Emitter · RB=1 MΩ, RE=1 kΩ | 1.0263 mA / 8.7054 V | 1.737 V | 1.037 V | 9.742 V | 8.705 V | 1.026 mA | 10.263 µA | 1.037 mA | Forward Active | OpenCode Browser | ผ่าน |
+| A4 | Emitter · RB=1 MΩ, RE=2 kΩ | 0.9401 mA / 8.0328 V | 2.599 V | 1.899 V | 9.932 V | 8.033 V | 0.940 mA | 9.401 µA | 0.950 mA | Forward Active | OpenCode Browser | ผ่าน |
+| A5 | Fixed · RB=0 | error ที่ช่อง RB | — | — | — | — | — | — | — | ไม่แสดงผล | OpenCode Browser | ผ่าน |
 
 **A5 รายละเอียด:** หน้าเว็บตอบ HTTP 200 พร้อมกล่อง "ไม่สามารถคำนวณได้" ข้อความ **"ค่า RB ต้องมากกว่า 0 Ω"** และไม่แสดงบล็อก `Region:` / ผลลัพธ์รอบก่อน
 
@@ -91,6 +91,38 @@ ohm_unit   -> HTTP 200 | region=Forward Active | VB=1.942 (ให้ผลตร
 
 - `docs/evidence/lab03-a1-divider.png` — A1 สำเร็จ: IC 1.230 mA, VCE 8.052 V, Forward Active
 - `docs/evidence/lab03-a5-rb-zero.png` — A5: error ที่ช่อง RB และไม่มีผลลัพธ์
+
+### ค่าอ้างอิงอิสระของโหมดใหม่ (คำนวณมือ)
+
+ใช้ VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V
+
+**A2 — Fixed Bias, RB = 1 MΩ**
+
+```
+IB = (VCC − VBE) / RB = (12 − 0.70) V / 1 MΩ = 11.300 µA
+IC = β·IB = 100 × 11.300 µA = 1.1300 mA
+IE = (β + 1)·IB = 101 × 11.300 µA = 1.1413 mA
+VB = VBE = 0.700 V ; VE = 0 V
+VC = VCC − IC·RC = 12 V − (1.1300 mA)(2.2 kΩ) = 9.5140 V
+VCE = VC − VE = 9.5140 V
+```
+
+**A3 — Emitter Bias, RB = 1 MΩ, RE = 1 kΩ**
+
+```
+IB = (VCC − VBE) / [RB + (β + 1)·RE]
+   = 11.30 V / (1 MΩ + 101 × 1 kΩ) = 11.30 V / 1.101 MΩ = 10.2634 µA
+IC = β·IB = 1.0263 mA
+IE = (β + 1)·IB = 1.0366 mA
+VE = IE·RE = (1.0366 mA)(1 kΩ) = 1.0366 V
+VB = VE + VBE = 1.7366 V
+VC = 12 V − (1.0263 mA)(2.2 kΩ) = 9.7421 V
+VCE = VC − VE = 8.7054 V
+```
+
+A4 ใช้สมการเดียวกับ A3 โดยเปลี่ยน RE เป็น 2 kΩ → IB = 9.4010 µA, IC = 0.9401 mA, VCE = 8.0328 V
+
+**บทบาท AI กับผู้ตรวจ:** AI เขียนสมการ/โค้ด/เทสต์/เอกสาร; นักศึกษาตรวจสมการมือข้างบน กด A1–A5 ในเบราว์เซอร์ และทบทวน commit ก่อนส่ง โค้ดเลือกฟังก์ชันอยู่ที่ `app.py` บรรทัด 62–79 (`if mode == ...`) แปลง kΩ→Ω ที่ `app.py` บรรทัด 55 (`scale = 1000.0 if unit == "k" else 1.0`) และสมการอยู่ที่ `dc_bias.py` บรรทัด 157–220
 
 A1 ยังได้ผลตรงกับ Lab 02 ทุกหลัก (VTH 2.163934 V, IB 12.2986 µA, IC 1.2299 mA, VCE 8.0522 V) จึงยืนยันว่าโหมดใหม่ไม่กระทบผลเดิม
 

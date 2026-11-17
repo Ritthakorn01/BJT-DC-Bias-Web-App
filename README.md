@@ -110,6 +110,19 @@ tolerance สำหรับตรวจหน้าเว็บ: IC ±0.01 mA, 
 
 เลือกหน่วยตัวต้านทาน (kΩ หรือ Ω) ได้จาก dropdown — ค่าตัวต้านทานของโหมดนั้นจะถูกแปลงเป็น Ω ก่อนคำนวณครั้งเดียว
 
+## ข้อมูลสำหรับส่งงาน (Lab 03)
+
+- GitHub repository: <https://github.com/Ritthakorn01/BJT-DC-Bias-Web-App>
+- Pull Request: <https://github.com/Ritthakorn01/BJT-DC-Bias-Web-App/pull/1>
+- Commit SHA ของงาน Lab 03: `91c022f` (branch `feat/lab03-bias-modes`)
+- วิธีรัน/เปิดเว็บ/รันเทสต์: อยู่ในหัวข้อ **การติดตั้ง**, **การรันเว็บ** และ **การรันเทสต์** ด้านบน
+
+| ส่วน | AI สร้าง/ช่วย | สิ่งที่ตรวจแล้ว |
+|---|---|---|
+| โค้ด | `dc_bias.py` (สมการสามโหมด + validation), `app.py` (เลือกโหมด/แปลงหน่วย), `templates/index.html` | ทดสอบ unit/HTTP 50 ตัว และเทียบค่ามือ A1–A5 |
+| เอกสาร | design, validation log, README, screenshot หลักฐาน | ทวนตาราง A1–A5 กับค่าที่เห็นในเบราว์เซอร์จริง |
+| ตำแหน่งสำคัญ | เลือกฟังก์ชัน: `app.py` บรรทัด 62–79 · แปลง kΩ→Ω: `app.py` บรรทัด 55 · สมการ: `dc_bias.py` บรรทัด 157–220 | ตรวจว่า kΩ ถูกคูณครั้งเดียว และ Divider ให้ผลเดิมทุกหลัก |
+
 ## เอกสารเพิ่มเติม
 
 - `docs/lab03-design.md` — design ของ Lab 03
