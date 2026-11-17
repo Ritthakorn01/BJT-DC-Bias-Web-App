@@ -1,36 +1,51 @@
 # BJT DC Bias Web App
 
-เว็บแอปพลิเคชัน Flask สำหรับคำนวณ **DC Operating Point** ของวงจรขยาย BJT แบบ NPN Common Emitter ที่ไบแอสด้วย Voltage Divider (R1–R2) — ผลลัพธ์คำนวณจาก Python Backend ทุกครั้ง ไม่มีการฝังตัวเลขไว้ใน HTML และไม่มี JavaScript คำนวณผล
+เว็บแอปพลิเคชัน Flask สำหรับคำนวณ **DC Operating Point** ของวงจรขยาย BJT แบบ NPN Common Emitter สามโหมดไบอัส — **Voltage Divider**, **Fixed Bias** และ **Emitter Bias** (แหล่งจ่ายเดียว) ผลลัพธ์คำนวณจาก Python Backend ทุกครั้ง ไม่มีการฝังตัวเลขไว้ใน HTML และไม่มี JavaScript คำนวณผล
 
-ENG29 2121 Computer Programming for Electrical Engineers · Lab 02
+ENG29 2121 Computer Programming for Electrical Engineers · Lab 03
+
+## การเลือกโหมด
+
+เปิด <http://127.0.0.1:5000/> แล้วเลือกโหมดจาก dropdown **Bias Mode** กด **แสดงฟอร์มโหมดนี้** หน้าเว็บจะโหลดใหม่และแสดงเฉพาะช่องที่วงจรนั้นใช้ (ไม่ใช้ JavaScript)
+
+| โหมด | URL | ช่องที่ใช้ |
+|---|---|---|
+| Voltage Divider | `/` หรือ `/?mode=divider` | `r1`, `r2`, `rc`, `re` |
+| Fixed Bias | `/?mode=fixed` | `rb`, `rc` |
+| Emitter Bias | `/?mode=emitter` | `rb`, `rc`, `re` |
+
+ทุกโหมดใช้ `vcc`, `vbe`, `beta` และ `r_unit` (`k` = kΩ, ว่าง = Ω) ร่วมกัน
 
 ## แบบจำลองที่ใช้
 
 Forward-Active Approximation โดยถือว่า β และ VBE คงที่:
 
 ```
-VTH = VCC · R2 / (R1 + R2)
-RTH = R1 · R2 / (R1 + R2)
-IB  = (VTH − VBE) / (RTH + (β + 1)·RE)
+Fixed    : IB = (VCC − VBE) / RB
+Emitter  : IB = (VCC − VBE) / [RB + (β + 1)·RE]
+Divider  : IB = (VTH − VBE) / [RTH + (β + 1)·RE]
+           VTH = VCC · R2 / (R1 + R2)
+           RTH = R1 · R2 / (R1 + R2)
+
 IC  = β · IB
 IE  = (β + 1) · IB
-VE  = IE · RE
+VE  = IE · RE            (Fixed: VE = 0)
 VB  = VE + VBE
 VC  = VCC − IC · RC
 VCE = VC − VE
 ```
 
-**ข้อจำกัด:** แบบจำลองนี้ใช้ได้เฉพาะ Forward Active เท่านั้น ถ้า `VTH ≤ VBE` วงจรจะรายงานว่า **Cutoff** และถ้า `VCE < 0.2 V` จะรายงานว่า **Saturation** พร้อมคำเตือนว่าแบบจำลองใช้ไม่ได้ — ไม่ใช่ผลจาก SPICE และไม่มี AC / Transient / Load Line ในเวอร์ชันนี้
+**ข้อจำกัด:** แบบจำลองนี้ใช้ได้เฉพาะ Forward Active ถ้า IB ≤ 0 (Cutoff) หรือ `VCE ≤ 0.2 V` (Saturation) ระบบจะแสดง region และคำเตือนว่าแบบจำลองใช้ไม่ได้ — ไม่ใช่ผลจาก SPICE และยังไม่มี AC / Transient / Load Line
 
 ## โครงสร้างโปรเจกต์
 
 ```
-app.py              Flask app factory + routes (HTTP เท่านั้น)
-dc_bias.py          สมการ DC Bias, validation และ region warning (ไม่รู้จัก HTML)
-templates/index.html  ฟอร์มและตารางผลลัพธ์ (Jinja2)
-static/style.css    หน้าตาเว็บ (ไม่ใช้ CDN)
-tests/test_dc_bias.py  เทสต์วิศวกรรม
-tests/test_web.py      เทสต์ HTTP ด้วย Flask test client
+app.py                Flask app factory + routes และการเลือกโหมด
+dc_bias.py            สมการ DC Bias สามโหมด, validation และ region warning (ไม่รู้จัก HTML)
+templates/index.html  ฟอร์มเลือกโหมด ฟอร์มอินพุต และตารางผลลัพธ์ (Jinja2)
+static/style.css      หน้าตาเว็บ (ไม่ใช้ CDN)
+tests/test_dc_bias.py เทสต์วิศวกรรม
+tests/test_web.py     เทสต์ HTTP ด้วย Flask test client
 ```
 
 ## การติดตั้ง
@@ -66,33 +81,39 @@ python -m pip install -r requirements.txt
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-ผลปัจจุบัน: **20 tests, OK** (13 เทสต์วิศวกรรม + 7 เทสต์ HTTP)
+ผลปัจจุบัน: **50 tests, OK** (32 เทสต์วิศวกรรม + 18 เทสต์ HTTP)
 
-## ค่าอ้างอิงสำหรับตรวจผล
+## ค่าอ้างอิงสำหรับตรวจผล (A1–A5)
 
-VCC = 12 V, R1 = 100 kΩ, R2 = 22 kΩ, RC = 2.2 kΩ, RE = 1 kΩ, β = 100, VBE = 0.70 V
+ใช้ร่วมกัน: VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V
 
-| ปริมาณ | ค่าที่ควรได้ |
-|---|---|
-| VTH | 2.164 V |
-| RTH | 18.033 kΩ |
-| IB | 12.299 µA |
-| IC | 1.2299 mA |
-| IE | 1.2422 mA |
-| VE | 1.242 V |
-| VB | 1.942 V |
-| VC | 9.294 V |
-| VCE | 8.052 V |
-| Region | Forward Active |
+| กรณี | โหมด / อินพุต | IB | IC | VCE | Region |
+|---|---|---|---|---|---|
+| A1 | Divider · R1=100 kΩ, R2=22 kΩ, RE=1 kΩ | 12.299 µA | 1.2299 mA | 8.0522 V | Forward Active |
+| A2 | Fixed · RB=1 MΩ | 11.300 µA | 1.1300 mA | 9.5140 V | Forward Active |
+| A3 | Emitter · RB=1 MΩ, RE=1 kΩ | 10.263 µA | 1.0263 mA | 8.7054 V | Forward Active |
+| A4 | Emitter · RB=1 MΩ, RE=2 kΩ | 9.401 µA | 0.9401 mA | 8.0328 V | Forward Active |
+| A5 | Fixed · RB=0 | — | — | — | error ที่ช่อง RB |
+
+tolerance สำหรับตรวจหน้าเว็บ: IC ±0.01 mA, VCE ±0.02 V เทียบค่ามือที่ยังไม่ปัดเศษ
 
 ## การตรวจสอบข้อมูลนำเข้า
 
-ระบบจะแจ้ง error และไม่คำนวณ เมื่อ `VCC ≤ 0`, `R1/R2/RC/RE ≤ 0`, `β ≤ 0`, `VBE ≤ 0` หรือ `VBE ≥ VCC` หรือช่องใดไม่ใช่ตัวเลข (รับ comma คั่นหลักพันได้ เช่น `1,000`)
+ระบบจะแจ้ง error และไม่คำนวณ เมื่อ
 
-เลือกหน่วยตัวต้านทาน (kΩ หรือ Ω) ได้จาก dropdown — ค่าทั้งสี่ตัวจะถูกแปลงเป็น Ω ก่อนคำนวณ
+- ช่องที่โหมดนั้นใช้ ว่าง / ไม่ใช่ตัวเลข / ไม่เป็นจำนวนจำกัด
+- `VCC ≤ 0`, ตัวต้านทานที่ใช้ ≤ 0, `β ≤ 0`, `VBE ≤ 0`
+- หน่วยตัวต้านทานไม่ใช่ `k` หรือ `Ω`
+- โหมดไม่รู้จัก
+
+ถ้าอินพุตถูกต้องแต่ `VBE ≥ VCC` ระบบจะรายงาน **Cutoff** พร้อมคำเตือน (ไม่ใช่ input error)
+
+เลือกหน่วยตัวต้านทาน (kΩ หรือ Ω) ได้จาก dropdown — ค่าตัวต้านทานของโหมดนั้นจะถูกแปลงเป็น Ω ก่อนคำนวณครั้งเดียว
 
 ## เอกสารเพิ่มเติม
 
-- `docs/design-note.md` — design ที่อนุมัติแล้ว
-- `docs/validation.md` — ผลตรวจสอบเทียบค่าอิสระและ test log
+- `docs/lab03-design.md` — design ของ Lab 03
+- `docs/design-note.md` — design note เดิมของ Lab 02
+- `docs/validation.md` — ผลตรวจสอบเทียบค่าอิสระ, test log และตาราง A1–A5
 - `docs/reflection.md` — บันทึกสะท้อนคิด
+- `.opencode/skills/browser-acceptance-check/SKILL.md` — ขั้นตอนตรวจรับผ่านเบราว์เซอร์

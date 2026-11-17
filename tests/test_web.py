@@ -69,10 +69,97 @@ class CalculateRouteTests(unittest.TestCase):
         self.assertNotIn("nan", body)
         self.assertNotIn("inf", body)
 
+    def test_unknown_resistor_unit_is_rejected(self):
+        body = self.post(r_unit="M").get_data(as_text=True)
+        self.assertIn("ต้องเป็น kΩ หรือ Ω", body)
+        self.assertNotIn("Region:", body)
+
     def test_thai_messages_are_utf8(self):
         response = self.post(r1="0")
         self.assertIn("charset=utf-8", response.headers.get("Content-Type", "").lower())
         self.assertIn("มากกว่า 0", response.get_data(as_text=True))
+
+
+FIXED_FORM = {
+    "mode": "fixed", "vcc": "12", "vbe": "0.70", "beta": "100",
+    "rc": "2.2", "rb": "1000", "r_unit": "k",
+}
+EMITTER_FORM = dict(FIXED_FORM, mode="emitter", re="1")
+
+
+class ModeCalculateTests(unittest.TestCase):
+    def setUp(self):
+        self.client = create_app().test_client()
+
+    def test_fixed_mode_calculates(self):
+        body = self.client.post("/calculate", data=FIXED_FORM).get_data(as_text=True)
+
+        self.assertIn("Fixed Bias", body)
+        self.assertIn("9.514", body)
+        self.assertIn("1.130 mA", body)
+        self.assertIn("Forward Active", body)
+
+    def test_emitter_mode_uses_re(self):
+        body = self.client.post("/calculate", data=EMITTER_FORM).get_data(as_text=True)
+
+        self.assertIn("Emitter Bias", body)
+        self.assertIn("1.026 mA", body)
+        self.assertIn("8.705", body)
+
+    def test_larger_re_changes_the_result(self):
+        body = self.client.post(
+            "/calculate", data=dict(EMITTER_FORM, re="2")
+        ).get_data(as_text=True)
+
+        self.assertIn("0.940 mA", body)
+        self.assertIn("8.033", body)
+
+    def test_unknown_mode_is_error(self):
+        body = self.client.post(
+            "/calculate", data=dict(FIXED_FORM, mode="mystery")
+        ).get_data(as_text=True)
+
+        self.assertIn("โหมดวงจรไม่ถูกต้อง", body)
+        self.assertNotIn("Region:", body)
+
+    def test_zero_rb_names_the_field(self):
+        body = self.client.post(
+            "/calculate", data=dict(FIXED_FORM, rb="0")
+        ).get_data(as_text=True)
+
+        self.assertIn("RB", body)
+        self.assertNotIn("Region:", body)
+
+
+class ModeSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.client = create_app().test_client()
+
+    def test_default_page_is_divider_with_divider_fields(self):
+        body = self.client.get("/").get_data(as_text=True)
+
+        self.assertIn('value="divider" selected', body)
+        self.assertIn('id="r1"', body)
+        self.assertNotIn('id="rb"', body)
+
+    def test_fixed_mode_shows_rb_only(self):
+        body = self.client.get("/?mode=fixed").get_data(as_text=True)
+
+        self.assertIn('id="rb"', body)
+        self.assertNotIn('id="r1"', body)
+        self.assertIn('value="fixed" selected', body)
+
+    def test_emitter_mode_shows_rb_and_re(self):
+        body = self.client.get("/?mode=emitter").get_data(as_text=True)
+
+        self.assertIn('id="rb"', body)
+        self.assertIn('id="re"', body)
+        self.assertNotIn('id="r1"', body)
+
+    def test_unknown_mode_on_get_is_error(self):
+        body = self.client.get("/?mode=mystery").get_data(as_text=True)
+
+        self.assertIn("โหมดวงจรไม่ถูกต้อง", body)
 
 
 if __name__ == "__main__":

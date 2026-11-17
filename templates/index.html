@@ -9,46 +9,82 @@
 <body>
   <main class="shell">
     <header class="page-head">
-      <p class="eyebrow">ENG29 2121 · Lab 02</p>
+      <p class="eyebrow">ENG29 2121 · Lab 03</p>
       <h1>BJT DC Bias Calculator</h1>
-      <p class="subtitle">Voltage-Divider Bias · NPN Common Emitter · Forward-Active Approximation</p>
+      <p class="subtitle">Fixed · Emitter · Voltage Divider · NPN Common Emitter · Forward-Active Approximation</p>
     </header>
 
     <section class="card">
-      <h2>Input Parameters</h2>
-      <form method="post" action="/calculate">
+      <h2>Bias Mode</h2>
+      <form method="get" action="/">
         <div class="grid">
-          <label class="field">
+          <label class="field" for="mode">
+            <span>โหมดวงจร</span>
+            <select id="mode" name="mode">
+              {% for value, label in mode_labels.items() %}
+              <option value="{{ value }}" {% if value == mode %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="primary">แสดงฟอร์มโหมดนี้</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Input Parameters</h2>
+      <p class="subtitle">{{ mode_labels.get(mode, 'เลือกโหมดวงจรก่อนกรอกค่า') }}</p>
+      {% if mode in mode_labels %}
+      <form method="post" action="/calculate">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <div class="grid">
+          <label class="field" for="vcc">
             <span>V<sub>CC</sub> <em>[V]</em></span>
-            <input type="text" inputmode="decimal" name="vcc" value="{{ form.get('vcc', '') }}" autocomplete="off">
+            <input id="vcc" type="text" inputmode="decimal" name="vcc" value="{{ form.get('vcc', '') }}" autocomplete="off">
           </label>
-          <label class="field">
+          <label class="field" for="vbe">
             <span>V<sub>BE</sub> <em>[V]</em></span>
-            <input type="text" inputmode="decimal" name="vbe" value="{{ form.get('vbe', '0.70') }}" autocomplete="off">
+            <input id="vbe" type="text" inputmode="decimal" name="vbe" value="{{ form.get('vbe', '0.70') }}" autocomplete="off">
           </label>
-          <label class="field">
-            <span>R<sub>1</sub></span>
-            <input type="text" inputmode="decimal" name="r1" value="{{ form.get('r1', '') }}" autocomplete="off">
-          </label>
-          <label class="field">
-            <span>R<sub>2</sub></span>
-            <input type="text" inputmode="decimal" name="r2" value="{{ form.get('r2', '') }}" autocomplete="off">
-          </label>
-          <label class="field">
+          <label class="field" for="rc">
             <span>R<sub>C</sub></span>
-            <input type="text" inputmode="decimal" name="rc" value="{{ form.get('rc', '') }}" autocomplete="off">
+            <input id="rc" type="text" inputmode="decimal" name="rc" value="{{ form.get('rc', '') }}" autocomplete="off">
           </label>
-          <label class="field">
+          {% if mode == 'divider' %}
+          <label class="field" for="r1">
+            <span>R<sub>1</sub></span>
+            <input id="r1" type="text" inputmode="decimal" name="r1" value="{{ form.get('r1', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="r2">
+            <span>R<sub>2</sub></span>
+            <input id="r2" type="text" inputmode="decimal" name="r2" value="{{ form.get('r2', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="re">
             <span>R<sub>E</sub></span>
-            <input type="text" inputmode="decimal" name="re" value="{{ form.get('re', '') }}" autocomplete="off">
+            <input id="re" type="text" inputmode="decimal" name="re" value="{{ form.get('re', '') }}" autocomplete="off">
           </label>
-          <label class="field">
+          {% elif mode == 'fixed' %}
+          <label class="field" for="rb">
+            <span>R<sub>B</sub></span>
+            <input id="rb" type="text" inputmode="decimal" name="rb" value="{{ form.get('rb', '') }}" autocomplete="off">
+          </label>
+          {% elif mode == 'emitter' %}
+          <label class="field" for="rb">
+            <span>R<sub>B</sub></span>
+            <input id="rb" type="text" inputmode="decimal" name="rb" value="{{ form.get('rb', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="re">
+            <span>R<sub>E</sub></span>
+            <input id="re" type="text" inputmode="decimal" name="re" value="{{ form.get('re', '') }}" autocomplete="off">
+          </label>
+          {% endif %}
+          <label class="field" for="beta">
             <span>&beta;</span>
-            <input type="text" inputmode="decimal" name="beta" value="{{ form.get('beta', '') }}" autocomplete="off">
+            <input id="beta" type="text" inputmode="decimal" name="beta" value="{{ form.get('beta', '') }}" autocomplete="off">
           </label>
-          <label class="field">
-            <span>หน่วยตัวต้านทาน <em>[R<sub>1</sub>, R<sub>2</sub>, R<sub>C</sub>, R<sub>E</sub>]</em></span>
-            <select name="r_unit">
+          <label class="field" for="r_unit">
+            <span>หน่วยตัวต้านทาน</span>
+            <select id="r_unit" name="r_unit">
               <option value="k" {% if form.get('r_unit', 'k') == 'k' %}selected{% endif %}>k&Omega;</option>
               <option value="" {% if form.get('r_unit', 'k') == '' %}selected{% endif %}>&Omega;</option>
             </select>
@@ -56,6 +92,7 @@
         </div>
         <button type="submit" class="primary">Calculate DC Bias</button>
       </form>
+      {% endif %}
     </section>
 
     {% if errors %}
@@ -79,15 +116,15 @@
     <section class="card results">
       <h2>DC Bias Results</h2>
       {% if result %}
-      <p class="region">Region: <strong>{{ result.region }}</strong></p>
+      <p class="region">{{ mode_labels.get(mode, mode) }} · Region: <strong>{{ result.region }}</strong></p>
       <dl class="readouts">
-        <div><dt>V<sub>B</sub></dt><dd>{{ "%.3f"|format(result.vb) }} V</dd></div>
-        <div><dt>V<sub>E</sub></dt><dd>{{ "%.3f"|format(result.ve) }} V</dd></div>
-        <div><dt>V<sub>C</sub></dt><dd>{{ "%.3f"|format(result.vc) }} V</dd></div>
-        <div><dt>V<sub>CE</sub></dt><dd>{{ "%.3f"|format(result.vce) }} V</dd></div>
-        <div><dt>I<sub>C</sub></dt><dd>{{ "%.3f"|format(result.ic * 1000) }} mA</dd></div>
-        <div><dt>I<sub>B</sub></dt><dd>{{ "%.3f"|format(result.ib * 1000000) }} µA</dd></div>
-        <div><dt>I<sub>E</sub></dt><dd>{{ "%.3f"|format(result.ie * 1000) }} mA</dd></div>
+        <div><dt>V<sub>B</sub></dt><dd>{{ "%.3f"|format(result.vb_v) }} V</dd></div>
+        <div><dt>V<sub>E</sub></dt><dd>{{ "%.3f"|format(result.ve_v) }} V</dd></div>
+        <div><dt>V<sub>C</sub></dt><dd>{{ "%.3f"|format(result.vc_v) }} V</dd></div>
+        <div><dt>V<sub>CE</sub></dt><dd>{{ "%.3f"|format(result.vce_v) }} V</dd></div>
+        <div><dt>I<sub>C</sub></dt><dd>{{ "%.3f"|format(result.ic_ma) }} mA</dd></div>
+        <div><dt>I<sub>B</sub></dt><dd>{{ "%.3f"|format(result.ib_ua) }} µA</dd></div>
+        <div><dt>I<sub>E</sub></dt><dd>{{ "%.3f"|format(result.ie_ma) }} mA</dd></div>
       </dl>
       {% else %}
       <p class="muted">กรอกค่าอุปกรณ์แล้วกด <strong>Calculate DC Bias</strong> เพื่อดูจุดทำงาน DC</p>
