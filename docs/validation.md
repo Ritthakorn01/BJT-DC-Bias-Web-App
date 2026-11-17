@@ -1,6 +1,6 @@
 # Validation Log — BJT DC Bias Web App
 
-วันที่ตรวจ: 10 พฤศจิกายน 2569
+วันที่ตรวจ: 17 พฤศจิกายน 2569
 เครื่องที่ใช้: Windows 11, Python 3.15.2, Flask 3.1.3
 คำสั่งที่ใช้รันเทสต์:
 
@@ -8,20 +8,28 @@
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-ผลลัพธ์: **Ran 20 tests — OK**
+ผลลัพธ์: **Ran 50 tests — OK** (32 เทสต์วิศวกรรม + 18 เทสต์ HTTP)
 
 ## 1. Automated tests
 
 | กลุ่ม | จำนวน | ตรวจอะไร |
 |---|---|---|
-| `test_dc_bias.ReferencePointTests` | 3 | ค่า VB, VE, VC, VCE, IC, IE, IB ตรงกับการคำนวณมือ ±0.01 |
-| `test_dc_bias.InputParsingTests` | 4 | รับช่องว่างและ comma คั่นหลักพัน, ปฏิเสธค่าว่าง/ไม่ใช่ตัวเลข |
-| `test_dc_bias.ValidationTests` | 3 | ปฏิเสธ R ≤ 0, β ≤ 0, VBE ≥ VCC |
+| `test_dc_bias.ReferencePointTests` | 4 | ค่า VB, VE, VC, VCE, IC, IE, IB ของ Divider ตรงกับการคำนวณมือ ±0.01 และกรณี β สูงมาก |
+| `test_dc_bias.FixedBiasTests` | 2 | Fixed Bias (A2) และ Cutoff เมื่อ VBE ≥ VCC |
+| `test_dc_bias.EmitterBiasTests` | 3 | Emitter Bias (A3), RE ใหญ่ขึ้นทำให้ IC ลด (A4), Cutoff |
+| `test_dc_bias.ResultDictTests` | 2 | คีย์/หน่วยของ `BiasResult.to_dict()` และ alias `calculate` |
+| `test_dc_bias.CalculatorInputTests` | 4 | ฟังก์ชันคำนวณเรียกตรงด้วย RB/R1 = 0 หรือติดลบต้องได้ `ValidationError` ไม่ใช่ traceback/ผลติดลบ |
+| `test_dc_bias.InputParsingTests` | 5 | รับช่องว่างและ comma คั่นหลักพัน, ปฏิเสธค่าว่าง/ไม่ใช่ตัวเลข/ค่าไม่จำกัด |
+| `test_dc_bias.ValidationTests` | 3 | ปฏิเสธ R ≤ 0, β ≤ 0, และยอมให้ VBE ≥ VCC ไปเตือนที่ชั้นแบบจำลอง |
+| `test_dc_bias.ModeValidationTests` | 4 | แยก `validate_common` กับ `validate_resistors` ให้ใช้ได้รายโหมด |
+| `test_dc_bias.RegionThresholdTests` | 2 | ขอบเขต Saturation ใช้ `VCE ≤ 0.2 V` |
 | `test_dc_bias.RegionTests` | 3 | Cutoff, Saturation, Forward Active |
 | `test_web.WebIndexTests` | 1 | `GET /` → 200 และมีฟอร์ม |
-| `test_web.CalculateRouteTests` | 6 | ผลลัพธ์จาก server, error, หน่วย kΩ/Ω, ค่าสุดขั้ว, UTF-8 |
+| `test_web.CalculateRouteTests` | 8 | ผลลัพธ์จาก server, error, หน่วย kΩ/Ω, ค่าสุดขั้ว, หน่วยไม่รู้จัก, UTF-8 |
+| `test_web.ModeCalculateTests` | 5 | POST แต่ละโหมด, โหมดไม่รู้จัก, RB = 0 ระบุชื่อช่อง |
+| `test_web.ModeSelectionTests` | 4 | `GET /?mode=` แสดงเฉพาะช่องของโหมด และโหมดไม่รู้จักเป็น error |
 
-## 2. เทียบค่าจากเว็บกับการคำนวณมือ (A3)
+## 2. เทียบค่าจากเว็บกับการคำนวณมือ (Divider — A1 ของ Lab 03)
 
 ข้อมูลนำเข้า: VCC = 12 V, R1 = 100 kΩ, R2 = 22 kΩ, RC = 2.2 kΩ, RE = 1 kΩ, β = 100, VBE = 0.70 V
 
@@ -36,7 +44,7 @@
 | IE | 1.242 mA | 1.242 mA | 0.000 |
 | Region | Forward Active | Forward Active | ตรง |
 
-## 3. ตรวจรับ A1–A7
+## 3. ตรวจรับ Lab 02 (HTTP, A1–A7)
 
 รันเซิร์ฟเวอร์ด้วย `.venv\Scripts\python.exe -m flask --app app run --port 5000` แล้วยิง HTTP request จริง
 
@@ -60,8 +68,60 @@ saturation -> HTTP 200 | region=Saturation | warning=True
 ohm_unit   -> HTTP 200 | region=Forward Active | VB=1.942 (ให้ผลตรงกับกรอกหน่วย kΩ)
 ```
 
-## 4. ข้อจำกัดที่ยังเหลือ
+## 4. ตรวจรับ Lab 03 (A1–A5) ผ่านเบราว์เซอร์จริง
 
-- ไม่ตรวจ DC Load Line หรือผลจาก SPICE — อยู่ในขอบเขต W4
+- วิธีที่ใช้จริง: **OpenCode Browser** (Chromium ใน OpenCode desktop app) — ไม่ใช่ Playwright MCP
+- `opencode.json` ตั้ง Playwright MCP ไว้แล้ว แต่ MCP server จะถูกโหลดตอนเริ่ม session จึงต้องรีสตาร์ท OpenCode ก่อนใช้; session ที่ตรวจนี้ยังไม่เห็นเครื่องมือ Playwright
+- เบราว์เซอร์คุยกับ Flask dev server ที่ `http://127.0.0.1:5000/` โดยตรง
+- การสลับโหมดทำผ่าน dropdown **Bias Mode** + ปุ่ม **แสดงฟอร์มโหมดนี้** (`GET /?mode=...`) ไม่มี JavaScript คำนวณผล
+- ค่าที่กรอกร่วม: VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V, หน่วย kΩ
+- เกณฑ์ผ่าน: IC ±0.01 mA และ VCE ±0.02 V เทียบค่ามือ
+
+| # | โหมด / อินพุต | VB | VE | VC | VCE | IC | IB | IE | Region | ผล |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A1 | Divider · R1=100 kΩ, R2=22 kΩ, RE=1 kΩ | 1.942 V | 1.242 V | 9.294 V | 8.052 V | 1.230 mA | 12.299 µA | 1.242 mA | Forward Active | ผ่าน |
+| A2 | Fixed · RB=1 MΩ | 0.700 V | 0.000 V | 9.514 V | 9.514 V | 1.130 mA | 11.300 µA | 1.141 mA | Forward Active | ผ่าน |
+| A3 | Emitter · RB=1 MΩ, RE=1 kΩ | 1.737 V | 1.037 V | 9.742 V | 8.705 V | 1.026 mA | 10.263 µA | 1.037 mA | Forward Active | ผ่าน |
+| A4 | Emitter · RB=1 MΩ, RE=2 kΩ | 2.599 V | 1.899 V | 9.932 V | 8.033 V | 0.940 mA | 9.401 µA | 0.950 mA | Forward Active | ผ่าน |
+| A5 | Fixed · RB=0 | — | — | — | — | — | — | — | ไม่แสดงผล | ผ่าน |
+
+**A5 รายละเอียด:** หน้าเว็บตอบ HTTP 200 พร้อมกล่อง "ไม่สามารถคำนวณได้" ข้อความ **"ค่า RB ต้องมากกว่า 0 Ω"** และไม่แสดงบล็อก `Region:` / ผลลัพธ์รอบก่อน
+
+### หลักฐานจากเบราว์เซอร์
+
+- `docs/evidence/lab03-a1-divider.png` — A1 สำเร็จ: IC 1.230 mA, VCE 8.052 V, Forward Active
+- `docs/evidence/lab03-a5-rb-zero.png` — A5: error ที่ช่อง RB และไม่มีผลลัพธ์
+
+A1 ยังได้ผลตรงกับ Lab 02 ทุกหลัก (VTH 2.163934 V, IB 12.2986 µA, IC 1.2299 mA, VCE 8.0522 V) จึงยืนยันว่าโหมดใหม่ไม่กระทบผลเดิม
+
+## 5. ข้อจำกัดที่ยังเหลือ
+
+- ไม่ตรวจ DC Load Line หรือผลจาก SPICE — อยู่นอกขอบเขตของใบงาน
 - ไม่รองรับการบันทึก/แชร์ผลลัพธ์
 - ตัวเลขแสดง 3 ตำแหน่งทศนิยม ค่าที่ละเอียดกว่านี้ต้องอ่านจาก `dc_bias.py` โดยตรง
+- ยังไม่ได้รัน A1–A5 ผ่าน Playwright MCP ในเซสชันนี้ (ต้องรีสตาร์ท OpenCode ก่อน) — ใช้ OpenCode Browser แทนตามที่บันทึกไว้ข้างบน
+
+## 6. ปรับความแข็งแรงก่อน Lab 03 (17 พ.ย. 2569)
+
+ทำแบบ test-first ทุกข้อ และ A1 ยังได้ผลเดิมทุกหลัก (VTH 2.163934 V, IB 12.2986 µA, IC 1.2299 mA, VCE 8.0522 V)
+
+| ปัญหาเดิม | สิ่งที่แก้ | หลักฐาน |
+|---|---|---|
+| `float("nan")`, `"inf"`, `"1e400"` หลุดเข้าโมเดล | `to_float` ปฏิเสธค่าที่ไม่เป็นจำนวนจำกัด พร้อมชื่อฟิลด์ | `InputParsingTests.test_rejects_non_finite` |
+| β = 1e308 ทำให้ IB = 0 และ IC = 0 เงียบ ๆ | หารเศษ/ส่วนด้วย β ก่อนคำนวณ | `test_huge_beta_keeps_ic_at_forward_active_limit` (ได้ 1.4639 mA ตามลิมิต) |
+| `validate_inputs` บังคับ R1, R2, RE ทุกโหมด | แยก `validate_common` + `validate_resistors(**fields)` | `ModeValidationTests` |
+| เขต Saturation ใช้ `< 0.2` | `classify_region()` ใช้ `≤ 0.2` | `RegionThresholdTests` |
+| `VBE ≥ VCC` ถูกตีเป็น input error | ปล่อยให้โมเดลรายงาน Cutoff + warning | `test_accepts_vbe_at_vcc_so_model_reports_cutoff` |
+| `r_unit` ค่าอื่นถูกตีเป็น Ω เงียบ ๆ | รับเฉพาะ `k` และ `""` | `test_unknown_resistor_unit_is_rejected` |
+
+## 7. Final review fix (17 พ.ย. 2569)
+
+Fresh reviewer ตรวจทั้ง branch แล้วพบว่า Flask path ปลอดภัย แต่ถ้าเรียกฟังก์ชันคำนวณตรง ๆ ด้วย `RB = 0` จะได้ `ZeroDivisionError` และ `RB` ติดลบจะคืนกระแสติดลบเงียบ ๆ
+
+| ปัญหา | สิ่งที่แก้ | หลักฐาน |
+|---|---|---|
+| `calculate_fixed` / `calculate_emitter` / `calculate_divider` ไม่ตรวจอินพุตเอง | เรียก `validate_common` + `validate_resistors` ที่ต้นฟังก์ชันทั้งสามโหมด | `CalculatorInputTests` 4 ตัว (เขียนเทสต์เห็น fail ก่อนแก้: 3 failures + 1 error) |
+
+หลังแก้: **Ran 50 tests — OK** และไม่ได้แก้พฤติกรรมหน้าเว็บ (ยัง validate ที่ `app.py` แล้วเรียกฟังก์ชันซ้ำอย่างปลอดภัย)
+
+Minor ที่เลื่อนไว้: ข้อความ error กรณีค่าล้นเป็น infinity ยังขึ้นว่า "ต้องมากกว่า 0 Ω" (ควรเป็น "ต้องเป็นจำนวนจำกัด") และยังไม่มีเทสต์ regression ของการคงค่าหลัง error / หน่วย Ω ของ Fixed และ Emitter
