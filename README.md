@@ -75,13 +75,15 @@ python -m pip install -r requirements.txt
 
 > ต้องเปิดผ่าน Local Web Server เท่านั้น การ double-click เปิด `templates/index.html` จะไม่ทำงาน เพราะไม่มี Python มาคำนวณ
 
+เปิดด้วย `?mode=` เพื่อเลือกโหมด เช่น <http://127.0.0.1:5000/?mode=emitter> — ฟอร์มแต่ละโหมดมี **ค่าเริ่มต้นตามโจทย์ Lab 03 ใส่ไว้ให้แล้ว** (VCC 12 V, RC 2.2 kΩ, β 100, VBE 0.70 V, หน่วย kΩ; Divider R1 100 / R2 22 / RE 1 kΩ; Fixed RB 1000 kΩ; Emitter RB 1000 / RE 1 kΩ) กด **Calculate DC Bias** ได้ทันที กรณี A4 ให้เปลี่ยน RE จาก 1 เป็น 2 kΩ เองก่อนกด ค่าที่กรอกแล้วเกิด error จะยังคงอยู่ ไม่ถูกค่าเริ่มต้นทับ
+
 ## การรันเทสต์
 
 ```powershell
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-ผลปัจจุบัน: **50 tests, OK** (32 เทสต์วิศวกรรม + 18 เทสต์ HTTP)
+ผลปัจจุบัน: **55 tests, OK** (32 เทสต์วิศวกรรม + 23 เทสต์ HTTP)
 
 ## ค่าอ้างอิงสำหรับตรวจผล (A1–A5)
 

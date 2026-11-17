@@ -162,5 +162,41 @@ class ModeSelectionTests(unittest.TestCase):
         self.assertIn("โหมดวงจรไม่ถูกต้อง", body)
 
 
+class DefaultFormTests(unittest.TestCase):
+    def setUp(self):
+        self.client = create_app().test_client()
+
+    def test_divider_defaults(self):
+        body = self.client.get("/").get_data(as_text=True)
+        for field, value in (("vcc", "12"), ("vbe", "0.70"), ("rc", "2.2"),
+                             ("r1", "100"), ("r2", "22"), ("re", "1"),
+                             ("beta", "100")):
+            self.assertIn(f'name="{field}" value="{value}"', body)
+
+    def test_fixed_defaults_have_no_divider_fields(self):
+        body = self.client.get("/?mode=fixed").get_data(as_text=True)
+        self.assertIn('name="rb" value="1000"', body)
+        self.assertIn('name="vcc" value="12"', body)
+        self.assertNotIn('name="r1"', body)
+
+    def test_emitter_defaults_have_re(self):
+        body = self.client.get("/?mode=emitter").get_data(as_text=True)
+        self.assertIn('name="rb" value="1000"', body)
+        self.assertIn('name="re" value="1"', body)
+        self.assertNotIn('name="r1"', body)
+
+    def test_error_keeps_submitted_values(self):
+        form = {"mode": "fixed", "vcc": "99", "vbe": "0.70", "beta": "100",
+                "rc": "2.2", "rb": "0", "r_unit": "k"}
+        body = self.client.post("/calculate", data=form).get_data(as_text=True)
+        self.assertIn('name="vcc" value="99"', body)
+        self.assertIn('name="rb" value="0"', body)
+
+    def test_unknown_mode_has_no_defaults(self):
+        body = self.client.get("/?mode=mystery").get_data(as_text=True)
+        self.assertIn("โหมดวงจรไม่ถูกต้อง", body)
+        self.assertNotIn('name="vcc"', body)
+
+
 if __name__ == "__main__":
     unittest.main()

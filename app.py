@@ -19,6 +19,15 @@ MODE_LABELS = {
     "emitter": "Emitter Bias",
 }
 
+DEFAULT_FORMS = {
+    "divider": {"vcc": "12", "vbe": "0.70", "rc": "2.2", "r1": "100",
+                "r2": "22", "re": "1", "beta": "100", "r_unit": "k"},
+    "fixed": {"vcc": "12", "vbe": "0.70", "rc": "2.2", "rb": "1000",
+              "beta": "100", "r_unit": "k"},
+    "emitter": {"vcc": "12", "vbe": "0.70", "rc": "2.2", "rb": "1000",
+                "re": "1", "beta": "100", "r_unit": "k"},
+}
+
 
 def create_app():
     app = Flask(__name__)
@@ -38,7 +47,7 @@ def create_app():
     def index():
         mode = request.args.get("mode", "divider")
         errors = [] if mode in MODE_LABELS else ["โหมดวงจรไม่ถูกต้อง"]
-        return render_page(mode, {"r_unit": "k"}, errors=errors)
+        return render_page(mode, dict(DEFAULT_FORMS.get(mode, {})), errors=errors)
 
     @app.post("/calculate")
     def calculate_bias():
