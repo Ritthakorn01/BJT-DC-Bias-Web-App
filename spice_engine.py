@@ -4,6 +4,7 @@ All internal values use SI units (V, A, ohm, F, Hz, s). Unit conversion for
 display happens in :func:`to_display` only.
 """
 
+import base64
 import math
 import os
 import re
@@ -267,3 +268,35 @@ def analyze(inputs: AmpInputs) -> SpiceRun:
         tran_png=tran_png(tran),
         engine_version=version,
     )
+
+
+def to_display(run: SpiceRun) -> dict:
+    """Convert SI results to presentation units and embed plots as data URIs."""
+    def png_uri(png: bytes) -> str:
+        return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+    return {
+        "engine_version": run.engine_version,
+        "op": {
+            "vb_v": run.op.vb,
+            "ve_v": run.op.ve,
+            "vc_v": run.op.vc,
+            "vce_v": run.op.vce,
+            "ic_ma": run.op.ic * 1000.0,
+            "ib_ua": run.op.ib * 1_000_000.0,
+            "region": run.op.region,
+        },
+        "ac": {
+            "midband_gain_db": run.ac.midband_gain_db,
+            "gain_1khz_db": run.ac.gain_at_1khz_db,
+            "points": len(run.ac.freq),
+            "png_uri": png_uri(run.ac_png),
+        },
+        "tran": {
+            "vin_pp_mv": run.tran.vin_pp * 1000.0,
+            "vout_pp_mv": run.tran.vout_pp * 1000.0,
+            "inverted": run.tran.inverted,
+            "points": len(run.tran.time),
+            "png_uri": png_uri(run.tran_png),
+        },
+    }

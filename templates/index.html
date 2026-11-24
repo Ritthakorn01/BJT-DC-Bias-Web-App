@@ -77,6 +77,39 @@
             <span>R<sub>E</sub></span>
             <input id="re" type="text" inputmode="decimal" name="re" value="{{ form.get('re', '') }}" autocomplete="off">
           </label>
+          {% elif mode == 'amp' %}
+          <label class="field" for="r1">
+            <span>R<sub>1</sub></span>
+            <input id="r1" type="text" inputmode="decimal" name="r1" value="{{ form.get('r1', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="r2">
+            <span>R<sub>2</sub></span>
+            <input id="r2" type="text" inputmode="decimal" name="r2" value="{{ form.get('r2', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="re">
+            <span>R<sub>E</sub></span>
+            <input id="re" type="text" inputmode="decimal" name="re" value="{{ form.get('re', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="rl">
+            <span>R<sub>L</sub></span>
+            <input id="rl" type="text" inputmode="decimal" name="rl" value="{{ form.get('rl', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="cin">
+            <span>C<sub>in</sub> <em>[µF]</em></span>
+            <input id="cin" type="text" inputmode="decimal" name="cin" value="{{ form.get('cin', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="cout">
+            <span>C<sub>out</sub> <em>[µF]</em></span>
+            <input id="cout" type="text" inputmode="decimal" name="cout" value="{{ form.get('cout', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="vs_mv">
+            <span>V<sub>s</sub> <em>[mV peak]</em></span>
+            <input id="vs_mv" type="text" inputmode="decimal" name="vs_mv" value="{{ form.get('vs_mv', '') }}" autocomplete="off">
+          </label>
+          <label class="field" for="freq">
+            <span>f <em>[Hz]</em></span>
+            <input id="freq" type="text" inputmode="decimal" name="freq" value="{{ form.get('freq', '') }}" autocomplete="off">
+          </label>
           {% endif %}
           <label class="field" for="beta">
             <span>&beta;</span>
@@ -113,6 +146,17 @@
     </section>
     {% endif %}
 
+    {% if mode == 'amp' %}
+    <section class="card spice">
+      {% if result %}
+      <p class="region">ngspice {{ result.engine_version }} · ผลจำลอง SPICE เทียบกับ dc_bias.py (Analytical)</p>
+      <img src="{{ result.ac.png_uri }}" alt="AC Bode plot">
+      <img src="{{ result.tran.png_uri }}" alt="Transient plot">
+      {% else %}
+      <p class="muted">กรอกค่าอุปกรณ์แล้วกด Calculate DC Bias เพื่อรัน ngspice</p>
+      {% endif %}
+    </section>
+    {% else %}
     <section class="card results">
       <h2>DC Bias Results</h2>
       {% if result %}
@@ -130,6 +174,7 @@
       <p class="muted">กรอกค่าอุปกรณ์แล้วกด <strong>Calculate DC Bias</strong> เพื่อดูจุดทำงาน DC</p>
       {% endif %}
     </section>
+    {% endif %}
   </main>
 </body>
 </html>

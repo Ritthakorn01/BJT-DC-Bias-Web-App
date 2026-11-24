@@ -1,5 +1,9 @@
 import unittest
+from dataclasses import replace
+from unittest import mock
 
+import app as app_module
+import spice_engine
 from app import create_app
 
 
@@ -196,6 +200,67 @@ class DefaultFormTests(unittest.TestCase):
         body = self.client.get("/?mode=mystery").get_data(as_text=True)
         self.assertIn("โหมดวงจรไม่ถูกต้อง", body)
         self.assertNotIn('name="vcc"', body)
+
+
+FAKE_RUN = spice_engine.SpiceRun(
+    op=spice_engine.OpPoint(vb=2.0, ve=1.3, vc=9.1, vce=7.8, ic=1.3e-3,
+                            ib=9e-6, region="Forward Active"),
+    ac=spice_engine.AcSweep(freq=(1000.0,), gain_db=(4.89,), phase_deg=(-179.9,),
+                            midband_gain_db=4.89, gain_at_1khz_db=4.89),
+    tran=spice_engine.Transient(time=(0.0,), vin=(0.01,), vout=(-0.0176,),
+                                vin_pp=0.02, vout_pp=0.035, inverted=True),
+    ac_png=b"\x89PNG-fake", tran_png=b"\x89PNG-fake", engine_version="47")
+
+VALID_AMP_FORM = dict(app_module.DEFAULT_FORMS["amp"], mode="amp")
+
+
+class AmpModeTests(unittest.TestCase):
+    def setUp(self):
+        self.client = app_module.create_app().test_client()
+
+    def test_get_amp_shows_spice_form_with_lab_defaults(self):
+        html = self.client.get("/?mode=amp").get_data(as_text=True)
+        self.assertIn('name="rl"', html)
+        self.assertIn('name="vs_mv"', html)
+        self.assertIn('value="10"', html)
+        self.assertIn("CE Amplifier (SPICE)", html)
+
+    def test_missing_value_keeps_form_and_reports_error(self):
+        resp = self.client.post("/calculate", data={"mode": "amp", "vcc": "12", "r_unit": "k"})
+        html = resp.get_data(as_text=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("ไม่สามารถคำนวณได้", html)
+        self.assertNotIn("data:image/png", html)
+
+    def test_zero_capacitance_is_rejected(self):
+        data = dict(VALID_AMP_FORM, cin="0")
+        html = self.client.post("/calculate", data=data).get_data(as_text=True)
+        self.assertIn("ค่า CIN ต้องมากกว่า 0 µF", html)
+
+    def test_comma_and_exponent_inputs_are_accepted(self):
+        inputs = app_module._parse_amp_form(dict(VALID_AMP_FORM, vcc="1,2", freq="1e3"))
+        self.assertAlmostEqual(inputs.vcc, 12.0)
+        self.assertAlmostEqual(inputs.freq, 1000.0)
+
+    def test_engine_failure_shows_error_and_no_plots(self):
+        with mock.patch("spice_engine.analyze",
+                        side_effect=spice_engine.SpiceError("ไม่พบ ngspice ในเครื่องนี้")):
+            html = self.client.post("/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertIn("ไม่พบ ngspice", html)
+        self.assertNotIn("data:image/png", html)
+
+    def test_success_renders_both_labels_and_plots(self):
+        with mock.patch("spice_engine.analyze", return_value=FAKE_RUN):
+            html = self.client.post("/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertIn("ngspice 47", html)
+        self.assertIn("Analytical", html)
+        self.assertEqual(html.count("data:image/png"), 2)
+
+    def test_large_gap_emits_soft_warning(self):
+        far = replace(FAKE_RUN, op=replace(FAKE_RUN.op, ic=2.5e-3))
+        with mock.patch("spice_engine.analyze", return_value=far):
+            html = self.client.post("/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertIn("ต่างจากการคำนวณมือเกิน 15%", html)
 
 
 if __name__ == "__main__":
