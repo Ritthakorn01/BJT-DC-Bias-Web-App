@@ -252,14 +252,18 @@ class SpiceRun:
 
 
 def analyze(inputs: AmpInputs) -> SpiceRun:
+    from spice_plots import ac_png, tran_png
+
     op_table, version = run_netlist(build_op_netlist(inputs), "op")
     ac_table, _ = run_netlist(build_ac_netlist(inputs), "ac")
     tran_table, _ = run_netlist(build_tran_netlist(inputs), "tran")
+    ac = parse_ac(ac_table)
+    tran = parse_tran(tran_table, inputs.freq)
     return SpiceRun(
         op=parse_op(op_table),
-        ac=parse_ac(ac_table),
-        tran=parse_tran(tran_table, inputs.freq),
-        ac_png=b"",
-        tran_png=b"",
+        ac=ac,
+        tran=tran,
+        ac_png=ac_png(ac),
+        tran_png=tran_png(tran),
         engine_version=version,
     )
