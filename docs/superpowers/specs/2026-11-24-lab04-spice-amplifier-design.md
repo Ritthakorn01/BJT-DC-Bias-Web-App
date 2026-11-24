@@ -117,8 +117,12 @@ class SpiceRun:  op, ac, tran, ac_png: bytes, tran_png: bytes, engine_version: s
 ```
 
 ฟังก์ชันหลัก: `analyze(inputs) -> SpiceRun`, `build_op_netlist`, `build_ac_netlist`,
-`build_tran_netlist`, `run_ngspice`, `parse_op`, `parse_ac`, `parse_tran`,
-`plot_ac`, `plot_tran`, `render_dc_png` (ถ้าต้องการกราฟ DC เพิ่ม — ไม่บังคับ)
+`build_tran_netlist`, `run_netlist`, `parse_op`, `parse_ac`, `parse_tran`,
+`plot_ac`, `plot_tran`, `to_display(run) -> dict`
+
+- `build_*_netlist(inputs)` อ้าง model ด้วยชื่อคงที่ `.include model.lib`
+- `run_netlist(netlist, tag, timeout_s=20.0) -> (table_text, engine_version)` สร้าง temp dir ต่อรอบ, คัดลอกไฟล์ model เข้าไปเป็น `model.lib`, แล้วรัน `[ngspice, "-b", "deck.cir", "-o", "run.log"]`
+- ตัวเลือกผ่าน env (มีไว้ทดสอบ/สลับ model): `NGSPICE_BIN` (default `ngspice`), `SPICE_MODEL_PATH` (default `spice/models/2n3904.lib`)
 
 ### Error taxonomy
 
@@ -138,7 +142,7 @@ class SpiceRun:  op, ac, tran, ac_png: bytes, tran_png: bytes, engine_version: s
 
 ```
 * CE amplifier — {kind}
-.include {model_path}
+.include model.lib
 VCC vcc 0 DC {vcc}
 R1  vcc vb {r1}
 R2  vb 0 {r2}
@@ -161,6 +165,7 @@ wrdata {outfile} {vectors}
 - `.op` → vectors: `v(vb) v(ve) v(vc) v(vcc)` + กระแส BJT (`@q1[ic]`, `@q1[ib]`) ถ้ามี; ถ้าไม่มีให้ fallback คำนวณ IC = (VCC − VC)/RC จาก node voltage และบันทึกที่มา
 - `.ac` → `v(out) v(in)`, 10 Hz–1 MHz, 20 จุด/decade
 - `.tran` → `v(in) v(out)`, `tstop = 5/freq`, `tstep = tstop/2000`
+- model ถูกคัดลอกเข้า temp dir เป็น `model.lib` ทุกครั้ง → ไม่มีปัญหา path มีช่องว่าง/อักษรไทย
 - ทุก deck อยู่คนละ temp dir, ลบใน `finally`
 
 ## 10. การอ่านผล
