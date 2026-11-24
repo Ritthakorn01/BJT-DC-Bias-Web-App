@@ -171,3 +171,33 @@ Fresh reviewer ตรวจทั้ง branch แล้วพบว่า Flask
 หลังแก้: **Ran 50 tests — OK** และไม่ได้แก้พฤติกรรมหน้าเว็บ (ยัง validate ที่ `app.py` แล้วเรียกฟังก์ชันซ้ำอย่างปลอดภัย)
 
 Minor ที่เลื่อนไว้: ข้อความ error กรณีค่าล้นเป็น infinity ยังขึ้นว่า "ต้องมากกว่า 0 Ω" (ควรเป็น "ต้องเป็นจำนวนจำกัด") และยังไม่มีเทสต์ regression ของการคงค่าหลัง error / หน่วย Ω ของ Fixed และ Emitter
+
+## 8. Lab 04 — CE Amplifier simulator ด้วย ngspice (24 พ.ย. 2569)
+
+โหมดที่ 4 `amp` ใช้ netlist จริง 3 การวิเคราะห์ (`.op`, `.ac`, `.tran`) ผ่าน ngspice 47 และ `wrdata` ASCII กราฟเป็น PNG ที่ matplotlib สร้างขึ้นจากข้อมูลจริงแล้วฝังเป็น base64 ไม่มี JavaScript ในแอปและไม่มีภาพ placeholder ผล SPICE ไม่บังคับตรงกับการคำนวณมือเพราะ model 2N3904 ที่ใช้เป็น **placeholder ไม่ใช่ fixture จากอาจารย์** (BF ≈ 416 เทียบ β = 100 ในฟอร์ม) ระบบแสดง % ผลต่างและ soft warning เมื่อเกิน 15%
+
+### 8.1 Browser acceptance B1–B8 (ข้อมูลที่อ่านจริงจาก browser)
+
+| รายการ | สิ่งที่ทดสอบ | ผลที่ได้ |
+|---|---|---|
+| B1 | 3 โหมดเดิมยังทำงาน | Divider IC 1.230 mA, VCE 8.052 V (VB 1.942, VE 1.242, VC 9.294); Fixed IC 1.130 mA, VCE 9.514 V; Emitter IC 1.026 mA, VCE 8.705 V; ทุกโหมด Region: Forward Active |
+| B2 | หน้าผล amp แยก SPICE/Analytical | SPICE VB 2.004 V, VE 1.333 V, VC 9.087 V, VCE 7.754 V, IC 1.324 mA, IB 8.887 µA; ทั้งสอง Region: Forward Active; ผลต่าง +3.2% / +7.3% / −2.2% / −3.7% / +7.7% |
+| B3 | เปลี่ยน RE 1 → 2 kΩ | IC 1.324 → 0.705 mA, VCE 9.032 V, AC midband −1.12 dB, Vout 17.58 mVpp |
+| B4 | AC sweep | Midband 4.89 dB, ที่ 1 kHz 4.89 dB, 101 จุด, PNG magnitude + phase แสดงจริง |
+| B5 | Transient | Vin 20.00 mVpp, Vout 35.12 mVpp, กลับเฟส: ใช่, 2008 จุด |
+| B6 | เปลี่ยน Vs 10 → 20 mV | Vin 40.00 mVpp, Vout 70.23 mVpp (ประมาณ 2×) |
+| B7 | error สองกรณี | `vcc=abc` → "ไม่สามารถคำนวณได้ / กรุณากรอกค่า VCC เป็นตัวเลข"; `NGSPICE_BIN` ชี้ไฟล์ที่ไม่มี → "ไม่พบ ngspice ในเครื่องนี้ กรุณาติดตั้งและเพิ่มเข้า PATH"; ทั้งสอง HTTP 200, ไม่มีกราฟค้าง, ค่าฟอร์มคงอยู่ |
+| B8 | screenshot สองขนาดจอ | `docs/screenshots/lab04-desktop.png` (238534 bytes) และ `lab04-mobile.png` (34266 bytes) จาก iframe กว้าง 390px จริง (`innerWidth=390`) พร้อมผล ngspice ในเฟรม — commit `36f8b3e` (ถ่ายก่อน polish ของ Task 9 ซึ่งเป็นการเพิ่ม grouping/summary/focus เท่านั้น) |
+
+### 8.2 Impeccable critique → polish → audit
+
+Critique แบบ dual-agent ให้คะแนน 20/40 และชี้ P1 สามเรื่อง: ผลลัพธ์อยู่ต่ำเกินไปหลัง POST, ฟอร์ม amp ไม่มี grouping, ไม่มี feedback ขณะรัน ngspice Polish ที่ทำ: แถบ `role="status"` “ผลลัพธ์ล่าสุด” ด้านบน, ลิงก์ข้ามไป `#results`, group label DC Bias / AC Coupling / Input Source / Model & Units, `role="alert" aria-live="assertive"` และ `autofocus` ที่ error heading, caption ที่ซ่อนด้วย `clip-path` + `scope="col"` ในตาราง, button/skip link focus ring ด้วย `var(--blue)` (6.54:1), `.panel h2` ขยาย 16 → 20px, เปลี่ยนแถบ error/warning จากขอบด้านเดียวเป็นขอบเต็ม พร้อมปรับสี `--warn` ให้ contrast 5.39:1 ไม่แตะสมการ ไม่แทนที่กราฟจริง และไม่เพิ่ม JavaScript
+
+Audit ให้ **15/20 (Good)**: A11y 3, Performance 4, Theming 2, Responsive 3, Implementation Integrity 3; ไม่มี P0/P1 (P2 3 รายการ: ไม่มี live progress ระหว่างรัน, ไม่มี permalink/export, detector false positive; P3 1 รายการ: tint colors ยัง hard-coded) Detector `impeccable detect --json --changed` ยังรายงาน `flat-type-hierarchy` 1 รายการ แต่เป็น false positive จาก Jinja `url_for` ที่ detector อ่าน CSS ไม่ได้ — ตรวจ computed style ใน browser แล้วว่า h1 24–32px, h2 20px, body 16px รายงานฉบับเต็มอยู่ที่ `.impeccable/audit/2026-11-24T11-37-56Z__templates-index-html.md`
+
+### 8.3 การตรวจหลัง polish
+
+- `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` → **Ran 90 tests — OK** (เพิ่ม `AmpPolishTests` 4 ตัว แบบ RED ก่อนแล้ว GREEN หลังแก้ template/CSS)
+- Browser หน้า `/?mode=amp` หลัง POST จริง: result strip แสดง `Forward Active · VCE 7.754 V · IC 1.324 mA · Gain 4.89 dB`; กราฟ 2 รูป natural size 792px โหลดครบ; caption อ่านได้; `role="status"` อยู่ถูกต้อง; ไม่มี console error; ไม่มี `<script>` ในเอกสาร
+- `impeccable shot` ที่ 1440×900 และ 390×844 ให้ไฟล์ 1440×1435 และ 390×2162 ตามลำดับ ไม่มี horizontal overflow
+- ข้อจำกัดที่รับทราบ: browser tool ส่ง Tab แล้ว `activeElement` ยังเป็น BODY จึงยืนยัน focus ring ด้วย computed style จาก CSS เท่านั้น ไม่ได้ยืนยันการเปลี่ยน focus ด้วยแป้นพิมพ์จริง; ไม่มี live loading state ระหว่าง ngspice รันเพราะห้ามใช้ JavaScript; ยังไม่รัน touch gesture จริง

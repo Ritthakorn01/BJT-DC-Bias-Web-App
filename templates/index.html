@@ -14,6 +14,13 @@
       <p class="subtitle">Fixed · Emitter · Voltage Divider · NPN Common Emitter · Forward-Active Approximation</p>
     </header>
 
+    {% if mode == 'amp' and result %}
+    <div class="result-strip" role="status">
+      <strong>ผลลัพธ์ล่าสุด</strong>
+      <span>{{ result.op.region }} · VCE {{ "%.3f"|format(result.op.vce_v) }} V · IC {{ "%.3f"|format(result.op.ic_ma) }} mA · Gain {{ "%.2f"|format(result.ac.midband_gain_db) }} dB</span>
+    </div>
+    {% endif %}
+
     <section class="card">
       <h2>Bias Mode</h2>
       <form method="get" action="/">
@@ -38,6 +45,7 @@
       <form method="post" action="/calculate">
         <input type="hidden" name="mode" value="{{ mode }}">
         <div class="grid">
+          {% if mode == 'amp' %}<p class="group-label">DC Bias</p>{% endif %}
           <label class="field" for="vcc">
             <span>V<sub>CC</sub> <em>[V]</em></span>
             <input id="vcc" type="text" inputmode="decimal" name="vcc" value="{{ form.get('vcc', '') }}" autocomplete="off">
@@ -90,6 +98,7 @@
             <span>R<sub>E</sub></span>
             <input id="re" type="text" inputmode="decimal" name="re" value="{{ form.get('re', '') }}" autocomplete="off">
           </label>
+          {% if mode == 'amp' %}<p class="group-label">AC Coupling</p>{% endif %}
           <label class="field" for="rl">
             <span>R<sub>L</sub></span>
             <input id="rl" type="text" inputmode="decimal" name="rl" value="{{ form.get('rl', '') }}" autocomplete="off">
@@ -102,6 +111,7 @@
             <span>C<sub>out</sub> <em>[µF]</em></span>
             <input id="cout" type="text" inputmode="decimal" name="cout" value="{{ form.get('cout', '') }}" autocomplete="off">
           </label>
+          {% if mode == 'amp' %}<p class="group-label">Input Source</p>{% endif %}
           <label class="field" for="vs_mv">
             <span>V<sub>s</sub> <em>[mV peak]</em></span>
             <input id="vs_mv" type="text" inputmode="decimal" name="vs_mv" value="{{ form.get('vs_mv', '') }}" autocomplete="off">
@@ -111,6 +121,7 @@
             <input id="freq" type="text" inputmode="decimal" name="freq" value="{{ form.get('freq', '') }}" autocomplete="off">
           </label>
           {% endif %}
+          {% if mode == 'amp' %}<p class="group-label">Model &amp; Units</p>{% endif %}
           <label class="field" for="beta">
             <span>&beta;</span>
             <input id="beta" type="text" inputmode="decimal" name="beta" value="{{ form.get('beta', '') }}" autocomplete="off">
@@ -124,13 +135,17 @@
           </label>
         </div>
         <button type="submit" class="primary">Calculate DC Bias</button>
+        {% if mode == 'amp' %}
+        <p class="field-note">รัน DC + AC + Transient ด้วย ngspice อาจใช้เวลาสักครู่</p>
+        <a class="skip-results" href="#results">ข้ามไปดูผลลัพธ์</a>
+        {% endif %}
       </form>
       {% endif %}
     </section>
 
     {% if errors %}
-    <section class="card alert alert-error" role="alert">
-      <h2>ไม่สามารถคำนวณได้</h2>
+    <section class="card alert alert-error" role="alert" aria-live="assertive">
+      <h2 tabindex="-1" autofocus>ไม่สามารถคำนวณได้</h2>
       <ul>
         {% for message in errors %}<li>{{ message }}</li>{% endfor %}
       </ul>
@@ -147,7 +162,7 @@
     {% endif %}
 
     {% if mode == 'amp' %}
-    <section class="card spice">
+    <section class="card spice" id="results" tabindex="-1">
       {% if result %}
       <div class="badges">
         <span class="badge badge-spice">ngspice {{ result.engine_version }} · ผลจำลองจริง</span>
@@ -168,7 +183,8 @@
           <div class="compare">
             <h3>SPICE เทียบ Analytical</h3>
             <table>
-              <thead><tr><th>ค่าที่เทียบ</th><th>SPICE</th><th>Analytical</th><th>ต่าง</th></tr></thead>
+              <caption class="visually-hidden">SPICE เทียบ Analytical</caption>
+              <thead><tr><th scope="col">ค่าที่เทียบ</th><th scope="col">SPICE</th><th scope="col">Analytical</th><th scope="col">ต่าง</th></tr></thead>
               <tbody>
                 {% for key, label in [('vb_v', 'VB [V]'), ('ve_v', 'VE [V]'), ('vc_v', 'VC [V]'), ('vce_v', 'VCE [V]'), ('ic_ma', 'IC [mA]')] %}
                 <tr>

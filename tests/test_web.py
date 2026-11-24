@@ -288,5 +288,38 @@ class AmpTemplateTests(unittest.TestCase):
         self.assertGreaterEqual(html.count("Forward Active"), 2)
 
 
+class AmpPolishTests(unittest.TestCase):
+    def test_get_amp_groups_fields_and_offers_skip_link(self):
+        html = app_module.create_app().test_client().get("/?mode=amp").get_data(as_text=True)
+        for label in ("DC Bias", "AC Coupling", "Input Source"):
+            self.assertIn(f'class="group-label">{label}', html)
+        self.assertIn('class="skip-results"', html)
+        self.assertIn("รัน DC + AC + Transient", html)
+
+    def test_result_has_top_summary_and_anchor(self):
+        with mock.patch("spice_engine.analyze", return_value=FAKE_RUN):
+            html = app_module.create_app().test_client().post(
+                "/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertIn('class="result-strip" role="status"', html)
+        self.assertIn("ผลลัพธ์ล่าสุด", html)
+        self.assertIn("7.800 V", html)
+        self.assertIn("1.300 mA", html)
+        self.assertIn('id="results"', html)
+
+    def test_error_box_is_assertive_and_focused(self):
+        html = app_module.create_app().test_client().post(
+            "/calculate", data=dict(VALID_AMP_FORM, cin="0")).get_data(as_text=True)
+        self.assertIn('aria-live="assertive"', html)
+        self.assertIn("autofocus", html)
+
+    def test_compare_table_has_caption_and_column_scope(self):
+        with mock.patch("spice_engine.analyze", return_value=FAKE_RUN):
+            html = app_module.create_app().test_client().post(
+                "/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertIn("<caption", html)
+        self.assertIn('scope="col"', html)
+
+
 if __name__ == "__main__":
     unittest.main()
+
