@@ -83,7 +83,7 @@ python -m pip install -r requirements.txt
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-ผลปัจจุบัน: **55 tests, OK** (32 เทสต์วิศวกรรม + 23 เทสต์ HTTP)
+ผลปัจจุบัน: **90 tests, OK** (55 เทสต์ Lab 03 + 35 เทสต์ Lab 04 รวม integration กับ ngspice จริง)
 
 ## ค่าอ้างอิงสำหรับตรวจผล (A1–A5)
 
@@ -111,6 +111,47 @@ tolerance สำหรับตรวจหน้าเว็บ: IC ±0.01 mA, 
 ถ้าอินพุตถูกต้องแต่ `VBE ≥ VCC` ระบบจะรายงาน **Cutoff** พร้อมคำเตือน (ไม่ใช่ input error)
 
 เลือกหน่วยตัวต้านทาน (kΩ หรือ Ω) ได้จาก dropdown — ค่าตัวต้านทานของโหมดนั้นจะถูกแปลงเป็น Ω ก่อนคำนวณครั้งเดียว
+
+## Lab 04 — CE Amplifier Simulator (ngspice)
+
+เลือกโหมด **CE Amplifier (SPICE)** ใน dropdown เดิมแล้วกด **แสดงฟอร์มโหมดนี้** ฟอร์มแบ่งเป็น DC Bias / AC Coupling / Input Source / Model & Units แล้วกด **Calculate DC Bias** เพื่อรัน `.op`, `.ac` และ `.tran` ด้วย ngspice หน้าผลแสดงจุดทำงานจาก SPICE เทียบการคำนวณมือ กราฟ Bode magnitude/phase และ waveform แบบ transient (PNG ที่สร้างจากข้อมูลจริงแล้วฝังเป็น base64 ไม่มี JavaScript ในแอป)
+
+### ติดตั้งและตรวจ ngspice
+
+ในเครื่องที่ใช้ตรวจรับ ngspice 47 อยู่ที่:
+
+```powershell
+C:\Users\B6807153\ngspice\bin\ngspice.exe --version
+# ** ngspice-47 : Circuit level simulation program
+```
+
+ถ้าเปิด Flask จาก PowerShell อีกชุด ให้เพิ่มไดเรกทอรี `bin` เข้า PATH ก่อน (หรือตั้ง `NGSPICE_BIN` เป็น path เต็มก็ได้):
+
+```powershell
+$env:PATH += ';C:\Users\B6807153\ngspice\bin'
+$env:SPICE_LIB_DIR = 'C:\Users\B6807153\ngspice\share\ngspice'
+.venv\Scripts\python.exe -m flask --app app run --port 5000
+```
+
+`SPICE_LIB_DIR` ไม่ได้ถูกอ่านโดยโค้ดของแอป — netlist ใช้ `.include model.lib` และโค้ดคัดลอกไฟล์โมเดลเข้า temp dir ทุกครั้งที่รัน จึงตั้งค่านี้เฉพาะกรณี ngspice แบบพกพาต้องการตำแหน่ง library เพิ่มเติม (ค่าในเครื่องนี้แสดงไว้ข้างบน)
+
+### ตัวแปรสภาพแวดล้อม
+
+| ตัวแปร | ค่าเริ่มต้น | ความหมาย |
+|---|---|---|
+| `NGSPICE_BIN` | `ngspice` | ชื่อ/พาธของ binary ที่จะเรียก ถ้าไม่มีจะแสดง error ว่า "ไม่พบ ngspice ในเครื่องนี้ กรุณาติดตั้งและเพิ่มเข้า PATH" |
+| `SPICE_MODEL_PATH` | `spice/models/2n3904.lib` | ไฟล์โมเดลที่คัดลอกเข้า temp dir ก่อนรัน |
+
+ตัวอย่างการ override:
+
+```powershell
+$env:NGSPICE_BIN = 'C:\Users\B6807153\ngspice\bin\ngspice.exe'
+$env:SPICE_MODEL_PATH = 'C:\Users\B6807153\Documents\GitHub\BJT DC Bias Web App\spice\models\2n3904.lib'
+```
+
+> **คำเตือน:** `spice/models/2n3904.lib` เป็น **placeholder ที่เลือกใช้เอง ไม่ใช่ fixture จากอาจารย์** ค่า BF ของโมเดลประมาณ 416 ขณะที่ β ในฟอร์มคือ 100 จึงเป็นเรื่องปกติที่ SPICE กับการคำนวณมือจะต่างกันหลายเปอร์เซ็นต์ (หน้าผลแสดง % ผลต่างและจะเตือนถ้าเกิน 15%) อย่านำตัวเลข SPICE ไปเทียบกับคำตอบของอาจารย์โดยไม่ระบุโมเดลที่ใช้
+
+หลักฐานการตรวจรับ B1–B8 อยู่ใน `docs/validation.md` ส่วนที่ 8 และ screenshot ที่ `docs/screenshots/lab04-desktop.png` / `lab04-mobile.png`
 
 ## ข้อมูลสำหรับส่งงาน (Lab 03)
 

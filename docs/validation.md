@@ -178,16 +178,18 @@ Minor ที่เลื่อนไว้: ข้อความ error กร�
 
 ### 8.1 Browser acceptance B1–B8 (ข้อมูลที่อ่านจริงจาก browser)
 
-| รายการ | สิ่งที่ทดสอบ | ผลที่ได้ |
-|---|---|---|
-| B1 | 3 โหมดเดิมยังทำงาน | Divider IC 1.230 mA, VCE 8.052 V (VB 1.942, VE 1.242, VC 9.294); Fixed IC 1.130 mA, VCE 9.514 V; Emitter IC 1.026 mA, VCE 8.705 V; ทุกโหมด Region: Forward Active |
-| B2 | หน้าผล amp แยก SPICE/Analytical | SPICE VB 2.004 V, VE 1.333 V, VC 9.087 V, VCE 7.754 V, IC 1.324 mA, IB 8.887 µA; ทั้งสอง Region: Forward Active; ผลต่าง +3.2% / +7.3% / −2.2% / −3.7% / +7.7% |
-| B3 | เปลี่ยน RE 1 → 2 kΩ | IC 1.324 → 0.705 mA, VCE 9.032 V, AC midband −1.12 dB, Vout 17.58 mVpp |
-| B4 | AC sweep | Midband 4.89 dB, ที่ 1 kHz 4.89 dB, 101 จุด, PNG magnitude + phase แสดงจริง |
-| B5 | Transient | Vin 20.00 mVpp, Vout 35.12 mVpp, กลับเฟส: ใช่, 2008 จุด |
-| B6 | เปลี่ยน Vs 10 → 20 mV | Vin 40.00 mVpp, Vout 70.23 mVpp (ประมาณ 2×) |
-| B7 | error สองกรณี | `vcc=abc` → "ไม่สามารถคำนวณได้ / กรุณากรอกค่า VCC เป็นตัวเลข"; `NGSPICE_BIN` ชี้ไฟล์ที่ไม่มี → "ไม่พบ ngspice ในเครื่องนี้ กรุณาติดตั้งและเพิ่มเข้า PATH"; ทั้งสอง HTTP 200, ไม่มีกราฟค้าง, ค่าฟอร์มคงอยู่ |
-| B8 | screenshot สองขนาดจอ | `docs/screenshots/lab04-desktop.png` (238534 bytes) และ `lab04-mobile.png` (34266 bytes) จาก iframe กว้าง 390px จริง (`innerWidth=390`) พร้อมผล ngspice ในเฟรม — commit `36f8b3e` (ถ่ายก่อน polish ของ Task 9 ซึ่งเป็นการเพิ่ม grouping/summary/focus เท่านั้น) |
+ตรวจบน branch `feat/lab04-spice-amplifier` ที่ commit `36f8b3e`; หลัง polish ตรวจซ้ำที่ `8105946` ตามข้อ 8.3 ทุกแถลงผ่าน ไม่มีรายการ `NOT RUN`
+
+| รายการ | วิธีตรวจ | ค่าที่อ่านได้จริง | สถานะ |
+|---|---|---|---|
+| B1 | เปิด `/?mode=divider`, `fixed`, `emitter` แล้วกด Calculate DC Bias ใน browser จริง | Divider IC 1.230 mA, VCE 8.052 V (VB 1.942, VE 1.242, VC 9.294); Fixed IC 1.130 mA, VCE 9.514 V; Emitter IC 1.026 mA, VCE 8.705 V; ทุกโหมด Region: Forward Active | ผ่าน |
+| B2 | เปิด `/?mode=amp` กด Calculate แล้วอ่านการ์ด DC SPICE/Analytical และตารางเทียบ | SPICE VB 2.004 V, VE 1.333 V, VC 9.087 V, VCE 7.754 V, IC 1.324 mA, IB 8.887 µA; ทั้งสอง Region: Forward Active; ผลต่าง +3.2% / +7.3% / −2.2% / −3.7% / +7.7% | ผ่าน |
+| B3 | เปลี่ยนช่อง RE เป็น 2 kΩ แล้วกด Calculate | IC 1.324 → 0.705 mA, VCE 9.032 V, AC midband −1.12 dB, Vout 17.58 mVpp | ผ่าน |
+| B4 | อ่านส่วน AC Bode และตรวจ PNG | Midband 4.89 dB, ที่ 1 kHz 4.89 dB, 101 จุด, PNG magnitude + phase แสดงจริง | ผ่าน |
+| B5 | อ่านส่วน Transient และตรวจ PNG | Vin 20.00 mVpp, Vout 35.12 mVpp, กลับเฟส: ใช่, 2008 จุด | ผ่าน |
+| B6 | เปลี่ยน Vs จาก 10 เป็น 20 mV แล้วกด Calculate | Vin 40.00 mVpp, Vout 70.23 mVpp (ประมาณ 2×) | ผ่าน |
+| B7 | กรอก `vcc=abc`; รีสตาร์ทเซิร์ฟเวอร์ด้วย `NGSPICE_BIN` ชี้ไฟล์ที่ไม่มี | `vcc=abc` → "ไม่สามารถคำนวณได้ / กรุณากรอกค่า VCC เป็นตัวเลข"; engine fail → "ไม่พบ ngspice ในเครื่องนี้ กรุณาติดตั้งและเพิ่มเข้า PATH"; ทั้งสอง HTTP 200, `imgs=0`, ไม่มีกราฟค้าง, ค่าฟอร์มคงอยู่ | ผ่าน |
+| B8 | screenshot desktop แบบ fullPage และ mobile ด้วย iframe กว้าง 390px จริง | `docs/screenshots/lab04-desktop.png` (238534 bytes) และ `lab04-mobile.png` (34266 bytes) จาก iframe ที่ `innerWidth=390` พร้อมผล ngspice ในเฟรม — commit `36f8b3e` (ถ่ายก่อน polish ของ Task 9 ซึ่งเป็นการเพิ่ม grouping/summary/focus เท่านั้น) | ผ่าน |
 
 ### 8.2 Impeccable critique → polish → audit
 
