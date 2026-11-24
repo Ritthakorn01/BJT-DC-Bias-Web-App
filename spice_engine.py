@@ -4,6 +4,7 @@ All internal values use SI units (V, A, ohm, F, Hz, s). Unit conversion for
 display happens in :func:`to_display` only.
 """
 
+import math
 import os
 import re
 import shutil
@@ -11,6 +12,8 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from dc_bias import classify_region
 
 MODEL_PATH = Path(__file__).resolve().parent / "spice" / "models" / "2n3904.lib"
 
@@ -114,3 +117,125 @@ def run_netlist(netlist: str, tag: str, timeout_s: float = 20.0) -> tuple[str, s
 
     match = re.search(r"ngspice-(\d+)", proc.stdout or "")
     return table, match.group(1) if match else "unknown"
+
+
+@dataclass(frozen=True)
+class OpPoint:
+    vb: float
+    ve: float
+    vc: float
+    vce: float
+    ic: float
+    ib: float
+    region: str
+
+
+@dataclass(frozen=True)
+class AcSweep:
+    freq: tuple[float, ...]
+    gain_db: tuple[float, ...]
+    phase_deg: tuple[float, ...]
+    midband_gain_db: float
+    gain_at_1khz_db: float
+
+
+@dataclass(frozen=True)
+class Transient:
+    time: tuple[float, ...]
+    vin: tuple[float, ...]
+    vout: tuple[float, ...]
+    vin_pp: float
+    vout_pp: float
+    inverted: bool
+
+
+def _table_rows(table: str) -> tuple[list[str], list[list[float]]]:
+    lines = [line for line in table.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้")
+    header = lines[0].split()
+    rows: list[list[float]] = []
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) != len(header):
+            raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้")
+        try:
+            rows.append([float(x) for x in parts])
+        except ValueError as exc:
+            raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้") from exc
+    return header, rows
+
+
+def parse_op(table: str) -> OpPoint:
+    header, rows = _table_rows(table)
+    # wrdata writes a leading scale column with no matching name.
+    names = header[1:]
+    values = dict(zip(names, rows[0][1:]))
+    try:
+        vb, ve, vc = values["v(vb)"], values["v(ve)"], values["v(vc)"]
+        ic, ib = values["@q1[ic]"], values["@q1[ib]"]
+    except KeyError as exc:
+        raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้") from exc
+    vce = vc - ve
+    return OpPoint(vb, ve, vc, vce, ic, ib, classify_region(vce))
+
+
+def parse_ac(table: str) -> AcSweep:
+    header, rows = _table_rows(table)
+    # Complex vectors appear as two adjacent columns with the same name.
+    def pair(name: str) -> tuple[int, int]:
+        idx = [i for i, h in enumerate(header) if h == name]
+        if len(idx) != 2:
+            raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้")
+        return idx[0], idx[1]
+
+    try:
+        out_r, out_i = pair("v(out)")
+        in_r, in_i = pair("v(in)")
+    except SpiceError:
+        raise
+    freqs, gains, phases = [], [], []
+    previous = None
+    for row in rows:
+        f = row[0]
+        out = complex(row[out_r], row[out_i])
+        vin = complex(row[in_r], row[in_i])
+        if abs(vin) == 0.0:
+            raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้")
+        gains.append(20.0 * math.log10(abs(out) / abs(vin)))
+        raw = math.degrees(math.atan2(out.imag, out.real)
+                           - math.atan2(vin.imag, vin.real))
+        if previous is not None:
+            while raw - previous > 180.0:
+                raw -= 360.0
+            while raw - previous < -180.0:
+                raw += 360.0
+        previous = raw
+        freqs.append(f)
+        phases.append(raw)
+    if not freqs:
+        raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้")
+    midband = [g for f, g in zip(freqs, gains) if 100.0 <= f <= 10000.0] or gains
+    nearest = min(range(len(freqs)), key=lambda i: abs(freqs[i] - 1000.0))
+    return AcSweep(tuple(freqs), tuple(gains), tuple(phases),
+                   max(midband), gains[nearest])
+
+
+def parse_tran(table: str, freq: float = 1.0) -> Transient:
+    header, rows = _table_rows(table)
+    if header != ["time", "v(in)", "v(out)"] or freq <= 0:
+        raise SpiceError("อ่านผลลัพธ์จาก ngspice ไม่ได้")
+    t = tuple(row[0] for row in rows)
+    vin = tuple(row[1] for row in rows)
+    vout = tuple(row[2] for row in rows)
+    start = t[-1] - 1.0 / freq
+    segment = [i for i, value in enumerate(t) if value >= start] or list(range(len(t)))
+    in_seg = [vin[i] for i in segment]
+    out_seg = [vout[i] for i in segment]
+    vin_pp = max(in_seg) - min(in_seg)
+    vout_pp = max(out_seg) - min(out_seg)
+    in_mean = sum(in_seg) / len(in_seg)
+    out_mean = sum(out_seg) / len(out_seg)
+    cov = sum((a - in_mean) * (b - out_mean) for a, b in zip(in_seg, out_seg))
+    inverted = cov < 0.0
+    return Transient(t, vin, vout, vin_pp, vout_pp, inverted)

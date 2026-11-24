@@ -10,6 +10,9 @@ from spice_engine import (
     build_ac_netlist,
     build_op_netlist,
     build_tran_netlist,
+    parse_ac,
+    parse_op,
+    parse_tran,
     run_netlist,
 )
 
@@ -86,3 +89,50 @@ class RunnerTests(unittest.TestCase):
             table, version = run_netlist("* t\n.end\n", "op")
         self.assertIn("time v(in)", table)
         self.assertEqual(version, "47")
+
+
+OP_TABLE = """ vcc             v(vb)           v(ve)           v(vc)           v(vcc)          @q1[ic]         @q1[ib]
+ 1.20000000e+01  2.00367450e+00  1.33287974e+00  9.08721626e+00  1.20000000e+01  1.32403477e-03  8.88736584e-06
+"""
+
+AC_TABLE = """ frequency       v(out)          v(out)          v(in)           v(in)
+ 1.00000000e+01 -1.68825586e+00 -3.90396170e-01  1.00000000e+00  0.00000000e+00
+ 1.00000000e+03 -1.75560000e+00 -2.00000000e-02  1.00000000e+00  0.00000000e+00
+"""
+
+TRAN_TABLE = """ time            v(in)           v(out)
+ 0.00000000e+00  0.00000000e+00  0.00000000e+00
+ 2.50000000e-07  1.57079632e-03 -4.66643146e-03
+"""
+
+
+class ParserTests(unittest.TestCase):
+    def test_op_reads_node_voltages_and_device_currents(self):
+        op = parse_op(OP_TABLE)
+        self.assertAlmostEqual(op.vb, 2.00367450, places=6)
+        self.assertAlmostEqual(op.vc, 9.08721626, places=6)
+        self.assertAlmostEqual(op.vce, 9.08721626 - 1.33287974, places=6)
+        self.assertAlmostEqual(op.ic, 1.32403477e-03, places=9)
+        self.assertEqual(op.region, "Forward Active")
+
+    def test_ac_pairs_real_and_imag_columns(self):
+        ac = parse_ac(AC_TABLE)
+        self.assertEqual(len(ac.freq), 2)
+        self.assertAlmostEqual(ac.freq[0], 10.0)
+        self.assertAlmostEqual(ac.gain_db[0], 4.7747, places=3)
+        self.assertAlmostEqual(abs(ac.phase_deg[0]), 166.98, places=1)
+
+    def test_tran_computes_peak_to_peak_and_inversion(self):
+        tr = parse_tran(TRAN_TABLE, 1e3)
+        self.assertEqual(len(tr.time), 2)
+        self.assertAlmostEqual(tr.vin_pp, 1.57079632e-03, places=9)
+        self.assertTrue(tr.inverted)
+
+    def test_malformed_table_raises_spice_error(self):
+        with self.assertRaises(SpiceError) as ctx:
+            parse_ac("garbage\n")
+        self.assertIn("อ่านผลลัพธ์", ctx.exception.message)
+
+    def test_header_only_table_is_rejected(self):
+        with self.assertRaises(SpiceError):
+            parse_tran(" time v(in) v(out)\n")
