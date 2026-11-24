@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 .env
+.superpowers/
+.impeccable/
+.opencode/commands/
+.opencode/skills/impeccable/
+
