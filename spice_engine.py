@@ -239,3 +239,27 @@ def parse_tran(table: str, freq: float = 1.0) -> Transient:
     cov = sum((a - in_mean) * (b - out_mean) for a, b in zip(in_seg, out_seg))
     inverted = cov < 0.0
     return Transient(t, vin, vout, vin_pp, vout_pp, inverted)
+
+
+@dataclass(frozen=True)
+class SpiceRun:
+    op: OpPoint
+    ac: AcSweep
+    tran: Transient
+    ac_png: bytes
+    tran_png: bytes
+    engine_version: str
+
+
+def analyze(inputs: AmpInputs) -> SpiceRun:
+    op_table, version = run_netlist(build_op_netlist(inputs), "op")
+    ac_table, _ = run_netlist(build_ac_netlist(inputs), "ac")
+    tran_table, _ = run_netlist(build_tran_netlist(inputs), "tran")
+    return SpiceRun(
+        op=parse_op(op_table),
+        ac=parse_ac(ac_table),
+        tran=parse_tran(tran_table, inputs.freq),
+        ac_png=b"",
+        tran_png=b"",
+        engine_version=version,
+    )

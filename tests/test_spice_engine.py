@@ -1,10 +1,14 @@
 import os
+import shutil
 import subprocess
+import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
 from spice_engine import (
+    MODEL_PATH,
     AmpInputs,
     SpiceError,
     build_ac_netlist,
@@ -14,6 +18,7 @@ from spice_engine import (
     parse_op,
     parse_tran,
     run_netlist,
+    analyze,
 )
 
 
@@ -136,3 +141,54 @@ class ParserTests(unittest.TestCase):
     def test_header_only_table_is_rejected(self):
         with self.assertRaises(SpiceError):
             parse_tran(" time v(in) v(out)\n")
+
+
+HAS_NGSPICE = shutil.which(os.environ.get("NGSPICE_BIN", "ngspice")) is not None
+
+
+@unittest.skipUnless(HAS_NGSPICE, "ngspice not installed")
+class AnalyzeIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.inputs = AmpInputs(vcc=12.0, r1=100e3, r2=22e3, rc=2.2e3, re=1e3,
+                                rl=10e3, cin=10e-6, cout=10e-6,
+                                vs_peak=10e-3, freq=1e3,
+                                beta_ref=100.0, vbe_ref=0.70)
+
+    def test_baseline_matches_measured_values(self):
+        run = analyze(self.inputs)
+        self.assertAlmostEqual(run.op.vb, 2.0037, delta=0.01)
+        self.assertAlmostEqual(run.op.ve, 1.3329, delta=0.01)
+        self.assertAlmostEqual(run.op.vc, 9.0872, delta=0.02)
+        self.assertAlmostEqual(run.op.ic, 1.3240e-3, delta=1e-5)
+        self.assertEqual(run.op.region, "Forward Active")
+        self.assertEqual(len(run.ac.freq), 101)
+        self.assertAlmostEqual(run.ac.midband_gain_db, 4.890, delta=0.05)
+        self.assertLess(abs(abs(run.ac.phase_deg[-1]) - 180.0), 5.0)
+        self.assertEqual(len(run.tran.time), 2008)
+        self.assertAlmostEqual(run.tran.vin_pp, 0.0200, delta=1e-4)
+        self.assertAlmostEqual(run.tran.vout_pp, 0.0351, delta=5e-4)
+        self.assertTrue(run.tran.inverted)
+        self.assertEqual(run.engine_version, "47")
+
+    def test_larger_re_lowers_collector_current(self):
+        higher = analyze(replace(self.inputs, re=2e3))
+        self.assertLess(higher.op.ic, 1.3240e-3)
+
+    def test_doubling_source_doubles_output_swing(self):
+        louder = analyze(replace(self.inputs, vs_peak=20e-3))
+        self.assertAlmostEqual(louder.tran.vout_pp, 0.0702, delta=2e-3)
+
+    def test_model_path_with_thai_and_space_still_runs(self):
+        with tempfile.TemporaryDirectory(prefix="โมเดล ทดสอบ ") as tmp:
+            target = Path(tmp, "โมเดล 2n3904.lib")
+            shutil.copy(MODEL_PATH, target)
+            with mock.patch.dict(os.environ, {"SPICE_MODEL_PATH": str(target)}):
+                run = analyze(self.inputs)
+        self.assertEqual(run.op.region, "Forward Active")
+
+    def test_extreme_values_never_raise_unexpected_exception(self):
+        for bad in (replace(self.inputs, re=1e-3), replace(self.inputs, vs_peak=50.0)):
+            try:
+                analyze(bad)
+            except SpiceError:
+                pass
