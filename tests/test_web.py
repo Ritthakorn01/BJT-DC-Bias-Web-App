@@ -263,5 +263,30 @@ class AmpModeTests(unittest.TestCase):
         self.assertIn("ต่างจากการคำนวณมือเกิน 15%", html)
 
 
+class AmpTemplateTests(unittest.TestCase):
+    def test_amp_page_has_all_fields_and_no_script(self):
+        html = app_module.create_app().test_client().get("/?mode=amp").get_data(as_text=True)
+        for name in ("vcc", "r1", "r2", "rc", "re", "rl", "cin", "cout", "vs_mv", "freq"):
+            self.assertIn(f'name="{name}"', html)
+        self.assertNotIn("<script", html)
+
+    def test_result_page_shows_three_cards_with_badges(self):
+        with mock.patch("spice_engine.analyze", return_value=FAKE_RUN):
+            html = app_module.create_app().test_client().post(
+                "/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertIn("DC Operating Point", html)
+        self.assertIn("AC Bode", html)
+        self.assertIn("Transient", html)
+        self.assertIn("ngspice 47", html)
+        self.assertIn("dc_bias.py", html)
+        self.assertEqual(html.count("<img"), 2)
+
+    def test_result_shows_region_for_both_sources(self):
+        with mock.patch("spice_engine.analyze", return_value=FAKE_RUN):
+            html = app_module.create_app().test_client().post(
+                "/calculate", data=VALID_AMP_FORM).get_data(as_text=True)
+        self.assertGreaterEqual(html.count("Forward Active"), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

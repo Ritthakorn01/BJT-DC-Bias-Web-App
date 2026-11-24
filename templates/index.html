@@ -149,9 +149,51 @@
     {% if mode == 'amp' %}
     <section class="card spice">
       {% if result %}
-      <p class="region">ngspice {{ result.engine_version }} · ผลจำลอง SPICE เทียบกับ dc_bias.py (Analytical)</p>
-      <img src="{{ result.ac.png_uri }}" alt="AC Bode plot">
-      <img src="{{ result.tran.png_uri }}" alt="Transient plot">
+      <div class="badges">
+        <span class="badge badge-spice">ngspice {{ result.engine_version }} · ผลจำลองจริง</span>
+        <span class="badge badge-ref">dc_bias.py (คำนวณมือ)</span>
+      </div>
+      <div class="plots-grid">
+        <article class="panel">
+          <h2>DC Operating Point — SPICE</h2>
+          <p class="region">Region (SPICE): <strong>{{ result.op.region }}</strong> · Region (Analytical): <strong>{{ result.analytical.region }}</strong></p>
+          <dl class="readouts">
+            <div><dt>V<sub>B</sub></dt><dd>{{ "%.3f"|format(result.op.vb_v) }} V</dd></div>
+            <div><dt>V<sub>E</sub></dt><dd>{{ "%.3f"|format(result.op.ve_v) }} V</dd></div>
+            <div><dt>V<sub>C</sub></dt><dd>{{ "%.3f"|format(result.op.vc_v) }} V</dd></div>
+            <div><dt>V<sub>CE</sub></dt><dd>{{ "%.3f"|format(result.op.vce_v) }} V</dd></div>
+            <div><dt>I<sub>C</sub></dt><dd>{{ "%.3f"|format(result.op.ic_ma) }} mA</dd></div>
+            <div><dt>I<sub>B</sub></dt><dd>{{ "%.3f"|format(result.op.ib_ua) }} µA</dd></div>
+          </dl>
+          <div class="compare">
+            <h3>SPICE เทียบ Analytical</h3>
+            <table>
+              <thead><tr><th>ค่าที่เทียบ</th><th>SPICE</th><th>Analytical</th><th>ต่าง</th></tr></thead>
+              <tbody>
+                {% for key, label in [('vb_v', 'VB [V]'), ('ve_v', 'VE [V]'), ('vc_v', 'VC [V]'), ('vce_v', 'VCE [V]'), ('ic_ma', 'IC [mA]')] %}
+                <tr>
+                  <td>{{ label }}</td>
+                  <td>{{ "%.4f"|format(result.op[key]) }}</td>
+                  <td>{{ "%.4f"|format(result.analytical[key]) }}</td>
+                  <td>{% if result.deltas[key] is not none %}{{ "%+.1f"|format(result.deltas[key]) }}%{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p class="note">β ในฟอร์มใช้เฉพาะการคำนวณมือ; model 2N3904 มี BF ≈ 416 จึงต่างได้ตามธรรมชาติ</p>
+          </div>
+        </article>
+        <article class="panel">
+          <h2>AC Bode</h2>
+          <p class="muted">Midband {{ "%.2f"|format(result.ac.midband_gain_db) }} dB · ที่ 1 kHz {{ "%.2f"|format(result.ac.gain_1khz_db) }} dB · {{ result.ac.points }} จุด</p>
+          <div class="plots"><img src="{{ result.ac.png_uri }}" alt="AC Bode magnitude and phase plot"></div>
+        </article>
+        <article class="panel">
+          <h2>Transient</h2>
+          <p class="muted">Vin {{ "%.2f"|format(result.tran.vin_pp_mv) }} mVpp · Vout {{ "%.2f"|format(result.tran.vout_pp_mv) }} mVpp · กลับเฟส: {{ "ใช่" if result.tran.inverted else "ไม่" }} · {{ result.tran.points }} จุด</p>
+          <div class="plots"><img src="{{ result.tran.png_uri }}" alt="Transient Vin and Vout waveform"></div>
+        </article>
+      </div>
       {% else %}
       <p class="muted">กรอกค่าอุปกรณ์แล้วกด Calculate DC Bias เพื่อรัน ngspice</p>
       {% endif %}
