@@ -4,10 +4,23 @@ All internal values use SI units (V, A, ohm, F, Hz, s). Unit conversion for
 display happens in :func:`to_display` only.
 """
 
+import os
+import re
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 MODEL_PATH = Path(__file__).resolve().parent / "spice" / "models" / "2n3904.lib"
+
+
+class SpiceError(Exception):
+    """A user-facing failure from the SPICE engine."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
 
 
 @dataclass(frozen=True)
@@ -67,3 +80,37 @@ def build_tran_netlist(inputs: AmpInputs) -> str:
     tstop = 5.0 / inputs.freq
     tstep = tstop / 2000.0
     return _deck(inputs, f"tran {_fmt(tstep)} {_fmt(tstop)}", "v(in) v(out)")
+
+
+def run_netlist(netlist: str, tag: str, timeout_s: float = 20.0) -> tuple[str, str]:
+    """Run one ngspice deck in a fresh temp dir; return (table text, version)."""
+    binary = os.environ.get("NGSPICE_BIN", "ngspice")
+    model = Path(os.environ.get("SPICE_MODEL_PATH", str(MODEL_PATH)))
+    with tempfile.TemporaryDirectory(prefix=f"spice-{tag}-") as tmp:
+        work = Path(tmp)
+        (work / "deck.cir").write_text(netlist, encoding="ascii")
+        shutil.copy(model, work / "model.lib")
+        try:
+            proc = subprocess.run(
+                [binary, "-b", "deck.cir", "-o", "run.log"],
+                cwd=work, capture_output=True, text=True, timeout=timeout_s,
+            )
+        except FileNotFoundError as exc:
+            raise SpiceError("ไม่พบ ngspice ในเครื่องนี้ กรุณาติดตั้งและเพิ่มเข้า PATH") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise SpiceError("ngspice ใช้เวลานานเกินกำหนด") from exc
+
+        if proc.returncode != 0:
+            tail = (proc.stderr or "").strip()[-300:]
+            detail = f": {tail}" if tail else ""
+            raise SpiceError(f"ngspice ทำงานไม่สำเร็จ ({tag}){detail}")
+
+        result = work / "out.txt"
+        if not result.is_file():
+            raise SpiceError(f"ngspice ไม่คืนผลลัพธ์ ({tag})")
+        table = result.read_text(encoding="utf-8", errors="replace")
+        if not table.strip():
+            raise SpiceError(f"ngspice ไม่คืนผลลัพธ์ ({tag})")
+
+    match = re.search(r"ngspice-(\d+)", proc.stdout or "")
+    return table, match.group(1) if match else "unknown"

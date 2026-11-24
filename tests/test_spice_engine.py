@@ -1,10 +1,16 @@
+import os
+import subprocess
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from spice_engine import (
     AmpInputs,
+    SpiceError,
     build_ac_netlist,
     build_op_netlist,
     build_tran_netlist,
+    run_netlist,
 )
 
 
@@ -37,3 +43,46 @@ class NetlistTests(unittest.TestCase):
         deck = build_tran_netlist(self.inputs)
         self.assertIn("tran 2.5e-06 0.005", deck)
         self.assertIn("wrdata out.txt v(in) v(out)", deck)
+
+
+class RunnerTests(unittest.TestCase):
+    def test_missing_binary_reports_thai_error(self):
+        with mock.patch.dict(os.environ, {"NGSPICE_BIN": "no-such-ngspice-xyz"}):
+            with self.assertRaises(SpiceError) as ctx:
+                run_netlist("* t\n.end\n", "op")
+        self.assertIn("ไม่พบ ngspice", ctx.exception.message)
+
+    def test_timeout_reports_thai_error(self):
+        with mock.patch("spice_engine.subprocess.run",
+                        side_effect=subprocess.TimeoutExpired("ngspice", 20)):
+            with self.assertRaises(SpiceError) as ctx:
+                run_netlist("* t\n.end\n", "op")
+        self.assertIn("นานเกินกำหนด", ctx.exception.message)
+
+    def test_nonzero_exit_includes_stderr_tail(self):
+        fake = mock.Mock(returncode=1, stdout="", stderr="Error: singular matrix")
+        with mock.patch("spice_engine.subprocess.run", return_value=fake):
+            with self.assertRaises(SpiceError) as ctx:
+                run_netlist("* t\n.end\n", "op")
+        self.assertIn("ไม่สำเร็จ", ctx.exception.message)
+        self.assertIn("singular matrix", ctx.exception.message)
+
+    def test_missing_output_file_is_empty_error(self):
+        fake = mock.Mock(returncode=0,
+                         stdout="** ngspice-47 : Circuit level simulation program", stderr="")
+        with mock.patch("spice_engine.subprocess.run", return_value=fake):
+            with self.assertRaises(SpiceError) as ctx:
+                run_netlist("* t\n.end\n", "op")
+        self.assertIn("ไม่คืนผลลัพธ์", ctx.exception.message)
+
+    def test_success_returns_table_and_version(self):
+        def fake_run(cmd, **kwargs):
+            Path(kwargs["cwd"], "out.txt").write_text("time v(in)\n0 0\n", encoding="ascii")
+            return mock.Mock(returncode=0,
+                             stdout="** ngspice-47 : Circuit level simulation program",
+                             stderr="")
+
+        with mock.patch("spice_engine.subprocess.run", side_effect=fake_run):
+            table, version = run_netlist("* t\n.end\n", "op")
+        self.assertIn("time v(in)", table)
+        self.assertEqual(version, "47")
